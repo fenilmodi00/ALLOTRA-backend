@@ -148,7 +148,7 @@ func TestSystemBehaviorUnderLoad(t *testing.T) {
 
 						case 3:
 							// IPO validation operation
-							testIPO := &models.IPO{
+							_ = &models.IPO{
 								ID:          uuid.New(),
 								StockID:     fmt.Sprintf("TEST_%d_%d", userID, op),
 								Name:        fmt.Sprintf("TestCompany_%d_%d", userID, op),

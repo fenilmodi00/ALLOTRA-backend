@@ -221,3 +221,73 @@ CREATE INDEX idx_ipo_update_log_ipo_id ON ipo_update_log(ipo_id);
 CREATE INDEX idx_ipo_update_log_timestamp ON ipo_update_log(timestamp DESC);
 CREATE INDEX idx_ipo_update_log_field_name ON ipo_update_log(field_name);
 CREATE INDEX idx_ipo_update_log_source ON ipo_update_log(source) WHERE source IS NOT NULL;
+
+-- GMP Price History table for storing historical GMP data over time
+CREATE TABLE gmp_price_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ipo_id UUID NOT NULL,
+    company_code VARCHAR(50) NOT NULL,
+    record_date DATE NOT NULL,
+    ipo_price DECIMAL(10, 2) NOT NULL,
+    gmp_value DECIMAL(10, 2) NOT NULL,
+    estimated_listing DECIMAL(10, 2) NOT NULL,
+    listing_percent DECIMAL(10, 2) NOT NULL,
+    estimated_profit DECIMAL(10, 2) DEFAULT 0,
+    subscription_status VARCHAR(100),
+    sub2_sauda DECIMAL(10, 2) DEFAULT 0,
+    last_updated VARCHAR(200),
+    data_source VARCHAR(100) DEFAULT 'investorgain.com',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Foreign key constraints
+    CONSTRAINT fk_gmp_history_ipo_id FOREIGN KEY (ipo_id) REFERENCES ipo_list(id) ON DELETE CASCADE,
+    
+    -- Unique constraint to prevent duplicates
+    CONSTRAINT uk_gmp_history_ipo_date UNIQUE (ipo_id, record_date),
+    
+    -- Check constraints for data validation
+    CONSTRAINT chk_gmp_history_prices_positive CHECK (
+        ipo_price >= 0 AND gmp_value >= 0 AND estimated_listing >= 0
+    ),
+    CONSTRAINT chk_gmp_history_listing_calculation CHECK (
+        ABS(estimated_listing - (ipo_price + gmp_value)) < 0.01
+    )
+);
+
+-- Add constraints for GMP price history table
+ALTER TABLE gmp_price_history ADD CONSTRAINT gmp_price_history_company_code_not_empty CHECK (company_code != '');
+ALTER TABLE gmp_price_history ADD CONSTRAINT gmp_price_history_data_source_not_empty CHECK (data_source != '');
+
+-- Performance indexes for GMP price history
+CREATE INDEX idx_gmp_history_ipo_id ON gmp_price_history(ipo_id);
+CREATE INDEX idx_gmp_history_company_code ON gmp_price_history(company_code);
+CREATE INDEX idx_gmp_history_record_date ON gmp_price_history(record_date DESC);
+CREATE INDEX idx_gmp_history_ipo_date_range ON gmp_price_history(ipo_id, record_date DESC);
+CREATE INDEX idx_gmp_history_created_at ON gmp_price_history(created_at DESC);
+
+-- Job execution tracking table for GMP history updates
+CREATE TABLE gmp_history_job_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    job_start_time TIMESTAMP NOT NULL,
+    job_end_time TIMESTAMP,
+    ipos_processed INTEGER DEFAULT 0,
+    successful_scrapes INTEGER DEFAULT 0,
+    failed_scrapes INTEGER DEFAULT 0,
+    total_records_added INTEGER DEFAULT 0,
+    execution_status VARCHAR(50) DEFAULT 'running',
+    error_summary TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Add constraints for job log table
+ALTER TABLE gmp_history_job_log ADD CONSTRAINT gmp_history_job_log_execution_status_not_empty CHECK (execution_status != '');
+ALTER TABLE gmp_history_job_log ADD CONSTRAINT gmp_history_job_log_ipos_processed_non_negative CHECK (ipos_processed >= 0);
+ALTER TABLE gmp_history_job_log ADD CONSTRAINT gmp_history_job_log_successful_scrapes_non_negative CHECK (successful_scrapes >= 0);
+ALTER TABLE gmp_history_job_log ADD CONSTRAINT gmp_history_job_log_failed_scrapes_non_negative CHECK (failed_scrapes >= 0);
+ALTER TABLE gmp_history_job_log ADD CONSTRAINT gmp_history_job_log_total_records_non_negative CHECK (total_records_added >= 0);
+
+-- Indexes for job log table
+CREATE INDEX idx_gmp_history_job_log_job_start_time ON gmp_history_job_log(job_start_time DESC);
+CREATE INDEX idx_gmp_history_job_log_execution_status ON gmp_history_job_log(execution_status);
+CREATE INDEX idx_gmp_history_job_log_created_at ON gmp_history_job_log(created_at DESC);

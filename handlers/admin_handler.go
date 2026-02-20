@@ -1,28 +1,54 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
 	"time"
 
 	"github.com/fenilmodi00/ipo-backend/jobs"
 	"github.com/fenilmodi00/ipo-backend/models"
-	"github.com/fenilmodi00/ipo-backend/services"
 	"github.com/gofiber/fiber/v2"
 	"github.com/sirupsen/logrus"
 )
 
-type AdminHandler struct {
-	IPOService *services.IPOService
-	GMPJob     *jobs.GMPUpdateJob
+type IPOAdminService interface {
+	CreateIPO(ctx context.Context, ipo *models.IPO) error
 }
 
-func NewAdminHandler(ipoService *services.IPOService, gmpJob *jobs.GMPUpdateJob) *AdminHandler {
+type GMPJobRunner interface {
+	Run()
+}
+
+type GMPHistoryJobRunner interface {
+	Run()
+	GetJobStatus() map[string]interface{}
+	GetLastRunMetrics() *jobs.JobMetrics
+}
+
+type AdminHandler struct {
+	DB            *sql.DB
+	IPOService    IPOAdminService
+	GMPJob        GMPJobRunner
+	GMPHistoryJob GMPHistoryJobRunner
+}
+
+func NewAdminHandler(db *sql.DB, ipoService IPOAdminService, gmpJob GMPJobRunner, gmpHistoryJob GMPHistoryJobRunner) *AdminHandler {
 	return &AdminHandler{
-		IPOService: ipoService,
-		GMPJob:     gmpJob,
+		DB:            db,
+		IPOService:    ipoService,
+		GMPJob:        gmpJob,
+		GMPHistoryJob: gmpHistoryJob,
 	}
 }
 
 func (h *AdminHandler) CreateIPO(c *fiber.Ctx) error {
+	if h.IPOService == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"success": false,
+			"error":   "IPO service unavailable",
+		})
+	}
+
 	var ipo models.IPO
 	if err := c.BodyParser(&ipo); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -46,6 +72,13 @@ func (h *AdminHandler) CreateIPO(c *fiber.Ctx) error {
 
 // TriggerGMPUpdate manually triggers the GMP update job
 func (h *AdminHandler) TriggerGMPUpdate(c *fiber.Ctx) error {
+	if h.GMPJob == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"success": false,
+			"error":   "GMP update job unavailable",
+		})
+	}
+
 	logrus.Info("Manual GMP update triggered via admin endpoint")
 
 	startTime := time.Now()
@@ -65,6 +98,13 @@ func (h *AdminHandler) TriggerGMPUpdate(c *fiber.Ctx) error {
 
 // GetGMPData returns all GMP data in the database for debugging
 func (h *AdminHandler) GetGMPData(c *fiber.Ctx) error {
+	if h.DB == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"success": false,
+			"error":   "Database unavailable",
+		})
+	}
+
 	query := `
 		SELECT ipo_name, company_code, gmp_value, gain_percent, estimated_listing, last_updated
 		FROM ipo_gmp 
@@ -72,7 +112,7 @@ func (h *AdminHandler) GetGMPData(c *fiber.Ctx) error {
 		LIMIT 20
 	`
 
-	rows, err := h.IPOService.DB.QueryContext(c.Context(), query)
+	rows, err := h.DB.QueryContext(c.Context(), query)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"success": false,
@@ -106,5 +146,88 @@ func (h *AdminHandler) GetGMPData(c *fiber.Ctx) error {
 		"success": true,
 		"data":    gmpData,
 		"count":   len(gmpData),
+	})
+}
+
+// TriggerGMPHistoryUpdate manually triggers the GMP history update job
+func (h *AdminHandler) TriggerGMPHistoryUpdate(c *fiber.Ctx) error {
+	if h.GMPHistoryJob == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"success": false,
+			"error":   "GMP history update job unavailable",
+		})
+	}
+
+	logrus.Info("Manual GMP history update triggered via admin endpoint")
+
+	startTime := time.Now()
+
+	// Run the GMP history update job
+	h.GMPHistoryJob.Run()
+
+	duration := time.Since(startTime)
+
+	return c.JSON(fiber.Map{
+		"success":   true,
+		"message":   "GMP history update job completed",
+		"duration":  duration.String(),
+		"timestamp": time.Now(),
+	})
+}
+
+// GetGMPHistoryJobStatus returns the status and metrics of the GMP history job
+func (h *AdminHandler) GetGMPHistoryJobStatus(c *fiber.Ctx) error {
+	if h.GMPHistoryJob == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"success": false,
+			"error":   "GMP history update job unavailable",
+		})
+	}
+
+	status := h.GMPHistoryJob.GetJobStatus()
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    status,
+	})
+}
+
+// GetGMPHistoryJobMetrics returns detailed metrics from the last job run
+func (h *AdminHandler) GetGMPHistoryJobMetrics(c *fiber.Ctx) error {
+	if h.GMPHistoryJob == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"success": false,
+			"error":   "GMP history update job unavailable",
+		})
+	}
+
+	metrics := h.GMPHistoryJob.GetLastRunMetrics()
+
+	if metrics == nil {
+		return c.JSON(fiber.Map{
+			"success": true,
+			"message": "No metrics available - job has not run yet",
+			"data":    nil,
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data": map[string]interface{}{
+			"job_start_time":          metrics.JobStartTime,
+			"job_end_time":            metrics.JobEndTime,
+			"duration":                metrics.Duration.String(),
+			"total_ipos":              metrics.TotalIPOs,
+			"successful_ipos":         metrics.SuccessfulIPOs,
+			"failed_ipos":             metrics.FailedIPOs,
+			"total_records_added":     metrics.TotalRecordsAdded,
+			"avg_records_per_ipo":     metrics.AvgRecordsPerIPO,
+			"avg_processing_time_ipo": metrics.AvgProcessingTimeIPO.String(),
+			"success_rate":            metrics.SuccessRate,
+			"queue_size_before":       metrics.QueueSizeBefore,
+			"queue_size_after":        metrics.QueueSizeAfter,
+			"queue_items_processed":   metrics.QueueItemsProcessed,
+			"error_summary":           metrics.ErrorSummary,
+		},
 	})
 }
