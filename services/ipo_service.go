@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/fenilmodi00/ipo-backend/models"
 	"github.com/fenilmodi00/ipo-backend/shared"
+	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 )
 
@@ -784,6 +786,40 @@ func normalizePagination(limit, offset int) (int, int) {
 	return limit, offset
 }
 
+func isUndefinedTableError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) {
+		return pqErr.Code == "42P01"
+	}
+
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "relation") && strings.Contains(msg, "does not exist")
+}
+
+func (s *IPOService) hasColumn(ctx context.Context, tableName, columnName string) (bool, error) {
+	query := `
+		SELECT EXISTS (
+			SELECT 1
+			FROM information_schema.columns
+			WHERE table_schema = 'public'
+			  AND table_name = $1
+			  AND column_name = $2
+		)
+	`
+
+	var exists bool
+	err := s.DB.QueryRowContext(ctx, query, tableName, columnName).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("check column existence %s.%s: %w", tableName, columnName, err)
+	}
+
+	return exists, nil
+}
+
 func (s *IPOService) GetIPOByID(ctx context.Context, id string) (*models.IPO, error) {
 	query := `SELECT id, name, company_code, description, price_band_low, price_band_high, 
               issue_size, open_date, close_date, result_date, registrar, stock_id, 
@@ -1021,34 +1057,52 @@ func (s *IPOService) GetActiveIPOsWithGMP(ctx context.Context) ([]models.IPOWith
 func (s *IPOService) GetActiveIPOsWithGMPPaginated(ctx context.Context, limit, offset int) ([]models.IPOWithGMP, error) {
 	limit, offset = normalizePagination(limit, offset)
 
-	// Query to get all IPOs that have corresponding GMP data (INNER JOIN ensures only IPOs with GMP data)
-	query := `
-		SELECT 
+	joinCondition := `(
+		i.stock_id IS NOT NULL AND g.stock_id IS NOT NULL AND i.stock_id = g.stock_id
+		OR i.company_code = g.company_code
+	)`
+	priorityOrder := `
+		CASE
+			WHEN i.stock_id IS NOT NULL AND g.stock_id IS NOT NULL AND i.stock_id = g.stock_id THEN 1
+			WHEN i.company_code = g.company_code THEN 2
+			ELSE 3
+		END
+	`
+
+	hasGMPIpoID, colErr := s.hasColumn(ctx, "ipo_gmp", "ipo_id")
+	if colErr != nil {
+		logrus.WithError(colErr).Warn("Failed to detect ipo_gmp.ipo_id column; using legacy join strategy")
+	} else if hasGMPIpoID {
+		joinCondition = `(
+			g.ipo_id = i.id
+			OR (g.ipo_id IS NULL AND i.stock_id IS NOT NULL AND g.stock_id IS NOT NULL AND i.stock_id = g.stock_id)
+			OR (g.ipo_id IS NULL AND i.company_code = g.company_code)
+		)`
+		priorityOrder = `
+			CASE
+				WHEN g.ipo_id = i.id THEN 1
+				WHEN i.stock_id IS NOT NULL AND g.stock_id IS NOT NULL AND i.stock_id = g.stock_id THEN 2
+				WHEN i.company_code = g.company_code THEN 3
+				ELSE 4
+			END
+		`
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
 			i.id, i.name, i.company_code, i.description, i.price_band_low, i.price_band_high,
 			i.issue_size, i.open_date, i.close_date, i.result_date, i.registrar, i.stock_id,
 			i.form_url, i.form_fields, i.form_headers, i.parser_config, i.status, i.subscription_status,
 			i.symbol, i.slug, i.listing_date, i.listing_gain, i.min_qty, i.min_amount,
 			i.logo_url, i.about, i.strengths, i.risks, i.created_at, i.updated_at, i.created_by,
 			g.gmp_value, g.gain_percent, g.estimated_listing, g.last_updated,
-			g.stock_id, g.subscription_status, g.listing_gain, g.ipo_status, 
+			g.stock_id, g.subscription_status, g.listing_gain, g.ipo_status,
 			g.data_source, g.extraction_metadata
 		FROM ipo_list i
-		INNER JOIN ipo_gmp g ON (
-			-- Primary relation: direct FK mapping
-			g.ipo_id = i.id
-			-- Backward-compatible fallback for rows not backfilled yet
-			OR (g.ipo_id IS NULL AND i.stock_id IS NOT NULL AND g.stock_id IS NOT NULL AND i.stock_id = g.stock_id)
-			OR (g.ipo_id IS NULL AND i.company_code = g.company_code)
-		)
-		ORDER BY 
-			-- Prioritize stock_id matches
-			CASE 
-				WHEN g.ipo_id = i.id THEN 1
-				WHEN i.stock_id IS NOT NULL AND g.stock_id IS NOT NULL AND i.stock_id = g.stock_id THEN 2
-				WHEN i.company_code = g.company_code THEN 3
-				ELSE 4
-			END,
-			CASE 
+		INNER JOIN ipo_gmp g ON %s
+		ORDER BY
+			%s,
+			CASE
 				WHEN CURRENT_TIMESTAMP BETWEEN COALESCE(i.open_date, '1900-01-01') AND COALESCE(i.close_date, '2100-01-01') THEN 1
 				WHEN i.open_date IS NOT NULL AND i.open_date > CURRENT_TIMESTAMP THEN 2
 				WHEN i.close_date IS NOT NULL AND i.close_date > CURRENT_TIMESTAMP - INTERVAL '30 days' THEN 3
@@ -1057,10 +1111,14 @@ func (s *IPOService) GetActiveIPOsWithGMPPaginated(ctx context.Context, limit, o
 			g.last_updated DESC,
 			i.created_at DESC
 		LIMIT $1 OFFSET $2
-	`
+	`, joinCondition, priorityOrder)
 
 	rows, err := s.DB.QueryContext(ctx, query, limit, offset)
 	if err != nil {
+		if isUndefinedTableError(err) {
+			logrus.WithError(err).Warn("Core IPO tables are missing; returning empty active IPO list with GMP")
+			return []models.IPOWithGMP{}, nil
+		}
 		return nil, fmt.Errorf("failed to query active IPOs with GMP: %w", err)
 	}
 	defer rows.Close()

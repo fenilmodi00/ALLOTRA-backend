@@ -28,6 +28,7 @@ WHERE g.id = pm.gmp_id
   AND pm.rn = 1
   AND g.ipo_id IS NULL;
 
+-- +goose StatementBegin
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -44,6 +45,7 @@ BEGIN
             ON DELETE SET NULL;
     END IF;
 END $$;
+-- +goose StatementEnd
 
 CREATE INDEX IF NOT EXISTS idx_ipo_gmp_ipo_id
     ON ipo_gmp(ipo_id)

@@ -118,7 +118,8 @@ CREATE INDEX idx_ipo_subscription_status ON ipo_list(subscription_status) WHERE 
 CREATE INDEX idx_ipo_name_gin ON ipo_list USING gin(to_tsvector('english', name));
 
 -- Index for recent IPOs (commonly queried)
-CREATE INDEX idx_ipo_recent ON ipo_list(created_at DESC, status) WHERE created_at >= CURRENT_DATE - INTERVAL '1 year';
+-- NOTE: Partial predicates cannot use non-immutable expressions like CURRENT_DATE.
+CREATE INDEX idx_ipo_recent ON ipo_list(created_at DESC, status);
 
 -- Supporting Tables
 
@@ -252,8 +253,8 @@ CREATE TABLE gmp_price_history (
     CONSTRAINT uk_gmp_history_ipo_date UNIQUE (ipo_id, record_date),
     
     -- Check constraints for data validation
-    CONSTRAINT chk_gmp_history_prices_positive CHECK (
-        ipo_price >= 0 AND gmp_value >= 0 AND estimated_listing >= 0
+    CONSTRAINT chk_gmp_history_ipo_price_positive CHECK (
+        ipo_price >= 0
     ),
     CONSTRAINT chk_gmp_history_listing_calculation CHECK (
         ABS(estimated_listing - (ipo_price + gmp_value)) < 0.01

@@ -7,6 +7,9 @@
 -- Drop the existing check constraint that blocks negative GMP
 ALTER TABLE gmp_price_history DROP CONSTRAINT IF EXISTS chk_gmp_history_prices_positive;
 
+-- Drop existing IPO-only check to keep this migration idempotent
+ALTER TABLE gmp_price_history DROP CONSTRAINT IF EXISTS chk_gmp_history_ipo_price_positive;
+
 -- Add new check constraint that only validates non-negative IPO price
 -- GMP can now be negative (grey market discount)
 ALTER TABLE gmp_price_history ADD CONSTRAINT chk_gmp_history_ipo_price_positive CHECK (ipo_price >= 0);

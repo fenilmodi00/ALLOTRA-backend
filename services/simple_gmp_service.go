@@ -402,36 +402,40 @@ func (s *SimpleGMPService) cleanCompanyName(name string) string {
 	return name
 }
 
+// generateCompanyCode produces a slug-style company code matching ipo_list format.
+// e.g. "Omnitech Engineering IPO U" → "omnitech-engineering"
 func (s *SimpleGMPService) generateCompanyCode(companyName string) string {
 	if companyName == "" {
 		return ""
 	}
 
-	// Convert to uppercase and remove special characters
-	code := strings.ToUpper(companyName)
-	code = regexp.MustCompile(`[^A-Z\s]`).ReplaceAllString(code, "")
+	name := companyName
 
-	// Take first letter of each word, max 6 characters
-	words := strings.Fields(code)
-	result := ""
-	for _, word := range words {
-		if len(word) > 0 {
-			result += string(word[0])
-		}
-		if len(result) >= 6 {
-			break
-		}
+	// Strip listing info like "L@876.00 (-2.67%)" or "CAllotted"
+	name = regexp.MustCompile(`L@[\d.,]+\s*\([^)]*\)`).ReplaceAllString(name, "")
+	name = regexp.MustCompile(`C?Allotted`).ReplaceAllString(name, "")
+
+	// Strip trailing status / exchange markers (order matters: longer first)
+	stripSuffixes := []string{
+		"BSE SME", "NSE SME", "BSE", "NSE",
+		"IPO U", "IPO O", "IPO C", "IPO",
+		"Ltd.", "Ltd", "Limited", "Pvt.", "Pvt",
+		"& Co.", "& Co",
+		"Details", // e.g. "Yaap Digital IPO Details"
+	}
+	for _, sfx := range stripSuffixes {
+		// Case-insensitive suffix removal
+		re := regexp.MustCompile(`(?i)\s*` + regexp.QuoteMeta(sfx) + `\s*$`)
+		name = re.ReplaceAllString(name, "")
 	}
 
-	// If too short, pad with company name characters
-	if len(result) < 3 && len(words) > 0 {
-		firstWord := words[0]
-		for i := 1; i < len(firstWord) && len(result) < 6; i++ {
-			result += string(firstWord[i])
-		}
-	}
+	// Trim, lowercase, replace non-alphanumeric runs with a hyphen
+	name = strings.TrimSpace(name)
+	name = strings.ToLower(name)
+	name = regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(name, "-")
+	name = strings.Trim(name, "-")
 
-	return result
+	return name
 }
 
 func (s *SimpleGMPService) parseGMPString(gmpText string) (float64, float64) {
@@ -559,7 +563,9 @@ func (s *SimpleGMPService) SaveGMPData(gmpList []models.EnhancedGMPData) error {
 			ipo_status, extraction_metadata
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 		ON CONFLICT (ipo_name) DO UPDATE SET
-			ipo_id = COALESCE(EXCLUDED.ipo_id, ipo_gmp.ipo_id),
+			ipo_id      = COALESCE(EXCLUDED.ipo_id, ipo_gmp.ipo_id),
+			company_code = COALESCE(EXCLUDED.company_code, ipo_gmp.company_code),
+			stock_id    = COALESCE(EXCLUDED.stock_id, ipo_gmp.stock_id),
 			gmp_value = EXCLUDED.gmp_value,
 			gain_percent = EXCLUDED.gain_percent,
 			estimated_listing = EXCLUDED.estimated_listing,
@@ -610,9 +616,121 @@ func (s *SimpleGMPService) FetchAndSaveGMPData() ([]models.EnhancedGMPData, erro
 		return nil, err
 	}
 
+	// Reconcile company_code and stock_id against ipo_list before saving
+	if s.db != nil {
+		s.reconcileWithIPOList(gmpData)
+	}
+
 	if err := s.SaveGMPData(gmpData); err != nil {
 		s.logger.WithError(err).Warn("Failed to save GMP data, but returning scraped data")
 	}
 
 	return gmpData, nil
+}
+
+// reconcileWithIPOList loads all ipo_list rows and matches each GMP record by
+// slug-normalised company name, then populates the correct company_code, ipo_id
+// and stock_id so the JOIN in GetActiveIPOsWithGMP succeeds.
+func (s *SimpleGMPService) reconcileWithIPOList(gmpData []models.EnhancedGMPData) {
+	type ipoRow struct {
+		id          string
+		companyCode string
+		stockID     string
+		name        string
+		slug        string // normalised for matching
+	}
+
+	rows, err := s.db.Query(`SELECT id, company_code, COALESCE(stock_id, ''), name FROM ipo_list`)
+	if err != nil {
+		s.logger.WithError(err).Warn("reconcileWithIPOList: failed to load ipo_list")
+		return
+	}
+	defer rows.Close()
+
+	var ipos []ipoRow
+	for rows.Next() {
+		var r ipoRow
+		if err := rows.Scan(&r.id, &r.companyCode, &r.stockID, &r.name); err != nil {
+			continue
+		}
+		r.slug = s.normaliseForMatch(r.name)
+		ipos = append(ipos, r)
+	}
+
+	// Build a lookup map: slug → ipoRow
+	bySlug := make(map[string]ipoRow, len(ipos))
+	for _, r := range ipos {
+		bySlug[r.slug] = r
+	}
+
+	matched, unmatched := 0, 0
+	for i := range gmpData {
+		gmpSlug := s.normaliseForMatch(gmpData[i].IPOName)
+		match, ok := bySlug[gmpSlug]
+		if !ok {
+			// Try matching against the already-generated company_code slug
+			match, ok = bySlug[gmpData[i].CompanyCode]
+		}
+		if !ok {
+			// Partial prefix match as last resort
+			for _, r := range ipos {
+				if strings.HasPrefix(r.slug, gmpSlug) || strings.HasPrefix(gmpSlug, r.slug) {
+					match = r
+					ok = true
+					break
+				}
+			}
+		}
+
+		if ok {
+			gmpData[i].CompanyCode = match.companyCode
+			if match.id != "" {
+				gmpData[i].IPOID = &match.id
+			}
+			if match.stockID != "" {
+				gmpData[i].StockID = &match.stockID
+			}
+			matched++
+		} else {
+			unmatched++
+			s.logger.WithFields(logrus.Fields{
+				"ipo_name": gmpData[i].IPOName,
+				"slug":     gmpSlug,
+			}).Debug("reconcileWithIPOList: no match found in ipo_list")
+		}
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"matched":   matched,
+		"unmatched": unmatched,
+	}).Info("reconcileWithIPOList: finished matching GMP records to ipo_list")
+}
+
+// normaliseForMatch produces a comparable slug from any company name string,
+// stripping common suffixes, punctuation and status markers.
+func (s *SimpleGMPService) normaliseForMatch(name string) string {
+	name = strings.TrimSpace(name)
+
+	// Strip listing info e.g. "L@876.00 (-2.67%)"
+	name = regexp.MustCompile(`L@[\d.,]+\s*\([^)]*\)`).ReplaceAllString(name, "")
+	// Strip allotment markers
+	name = regexp.MustCompile(`C?Allotted`).ReplaceAllString(name, "")
+
+	stripSuffixes := []string{
+		"BSE SME", "NSE SME", "BSE", "NSE",
+		"IPO U", "IPO O", "IPO C", "IPO",
+		"Ltd.", "Ltd", "Limited", "Pvt.", "Pvt",
+		"& Co.", "& Co",
+		"Details",
+		"India", // avoid over-stripping; only as suffix
+	}
+	for _, sfx := range stripSuffixes {
+		re := regexp.MustCompile(`(?i)\s*` + regexp.QuoteMeta(sfx) + `\s*$`)
+		name = re.ReplaceAllString(name, "")
+	}
+
+	name = strings.TrimSpace(name)
+	name = strings.ToLower(name)
+	name = regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(name, "")
+	return name
 }

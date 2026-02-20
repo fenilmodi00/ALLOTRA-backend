@@ -1,2 +1,6 @@
 .worktrees/
 worktrees/
+*.exe
+nul
+*.log
+.git_status_output.txt

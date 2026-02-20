@@ -422,11 +422,23 @@ func (s *GMPHistoryService) ScrapeIPOPriceHistory(ipoID string, companyCode stri
 }
 
 func (s *GMPHistoryService) ScrapeIPOPriceHistoryWithName(ipoID string, companyCode string, ipoName string) (*models.GMPPriceHistoryCollection, error) {
+	return s.ScrapeIPOPriceHistoryWithNameAndStockID(ipoID, "", companyCode, ipoName)
+}
+
+func (s *GMPHistoryService) ScrapeIPOPriceHistoryWithNameAndStockID(ipoID string, stockID string, companyCode string, ipoName string) (*models.GMPPriceHistoryCollection, error) {
 	if ipoID == "" || companyCode == "" {
 		return nil, fmt.Errorf("ipoID and companyCode are required")
 	}
 	if s.db == nil || s.scraper == nil {
 		return nil, fmt.Errorf("%w: scraping dependencies are not initialized", ErrServiceUnavailable)
+	}
+
+	// Get stock_id if not provided
+	if stockID == "" {
+		err := s.db.QueryRow("SELECT stock_id FROM ipo_list WHERE id = $1", ipoID).Scan(&stockID)
+		if err != nil {
+			s.logger.WithError(err).Warn("Failed to get stock_id, will use UUID for API")
+		}
 	}
 
 	if ipoName == "" {
@@ -438,12 +450,18 @@ func (s *GMPHistoryService) ScrapeIPOPriceHistoryWithName(ipoID string, companyC
 
 	s.logger.WithFields(logrus.Fields{
 		"ipo_id":       ipoID,
+		"stock_id":     stockID,
 		"ipo_name":     ipoName,
 		"company_code": companyCode,
 	}).Info("Scraping IPO price history via API")
 
 	// Scrape data from InvestorGain using API (more reliable than HTML scraping)
-	scrapedData, err := s.scraper.ScrapeHistoryFromAPI(ipoID, companyCode)
+	// Use stock_id if available, otherwise fall back to UUID
+	apiID := stockID
+	if apiID == "" {
+		apiID = ipoID
+	}
+	scrapedData, err := s.scraper.ScrapeHistoryFromAPI(apiID, companyCode)
 	if err != nil {
 		s.logger.WithError(err).Warn("API scraping failed, falling back to URL scraping")
 		// Fallback to URL scraping if API fails
@@ -561,16 +579,18 @@ func (s *GMPHistoryService) ProcessAllActiveIPOHistory() (*models.ProcessingResu
 
 	// Query active and recently closed IPOs with priority-based ordering (Requirement 4.2)
 	query := `
-		SELECT id, company_code, name, status, close_date
+		SELECT id, company_code, name, status, close_date, stock_id
 		FROM ipo_list
-		WHERE status IN ($2, $3, $4)
+		WHERE status IN ($2, $3, $4, $5, $6)
 		  AND (close_date IS NULL OR close_date >= $1)
 		ORDER BY 
 			CASE 
 				WHEN status = $2 THEN 1
 				WHEN status = $3 THEN 2
 				WHEN status = $4 THEN 3
-				ELSE 4
+				WHEN status = $5 THEN 4
+				WHEN status = $6 THEN 5
+				ELSE 6
 			END,
 			close_date DESC NULLS FIRST
 		LIMIT 100
@@ -578,7 +598,7 @@ func (s *GMPHistoryService) ProcessAllActiveIPOHistory() (*models.ProcessingResu
 
 	// Get IPOs from last 3 months
 	threeMonthsAgo := time.Now().AddDate(0, -3, 0)
-	rows, err := s.db.Query(query, threeMonthsAgo, models.StatusLive, models.StatusUpcoming, models.StatusClosed)
+	rows, err := s.db.Query(query, threeMonthsAgo, models.StatusLive, models.StatusUpcoming, models.StatusClosed, models.StatusResultOut, models.StatusListed)
 	if err != nil {
 		metrics.EndTime = time.Now()
 		metrics.ProcessingTime = metrics.EndTime.Sub(metrics.StartTime)
@@ -593,6 +613,7 @@ func (s *GMPHistoryService) ProcessAllActiveIPOHistory() (*models.ProcessingResu
 		Name        string
 		Status      string
 		CloseDate   *time.Time
+		StockID     string
 	}
 
 	for rows.Next() {
@@ -602,8 +623,9 @@ func (s *GMPHistoryService) ProcessAllActiveIPOHistory() (*models.ProcessingResu
 			Name        string
 			Status      string
 			CloseDate   *time.Time
+			StockID     string
 		}
-		err := rows.Scan(&ipo.ID, &ipo.CompanyCode, &ipo.Name, &ipo.Status, &ipo.CloseDate)
+		err := rows.Scan(&ipo.ID, &ipo.CompanyCode, &ipo.Name, &ipo.Status, &ipo.CloseDate, &ipo.StockID)
 		if err != nil {
 			s.logger.WithError(err).Error("Failed to scan IPO row")
 			metrics.ErrorDetails = append(metrics.ErrorDetails, fmt.Sprintf("Failed to scan IPO row: %v", err))
@@ -629,13 +651,14 @@ func (s *GMPHistoryService) ProcessAllActiveIPOHistory() (*models.ProcessingResu
 
 		s.logger.WithFields(logrus.Fields{
 			"ipo_id":       ipo.ID,
+			"stock_id":     ipo.StockID,
 			"company_code": ipo.CompanyCode,
 			"ipo_name":     ipo.Name,
 			"progress":     fmt.Sprintf("%d/%d", i+1, len(ipos)),
 		}).Info("Processing IPO price history")
 
 		// Scrape price history
-		collection, err := s.ScrapeIPOPriceHistoryWithName(ipo.ID, ipo.CompanyCode, ipo.Name)
+		collection, err := s.ScrapeIPOPriceHistoryWithNameAndStockID(ipo.ID, ipo.StockID, ipo.CompanyCode, ipo.Name)
 		if err != nil {
 			// Log error but continue processing (Requirement 4.3 - Error isolation)
 			errorMsg := fmt.Sprintf("IPO %s (%s): Failed to scrape - %v", ipo.Name, ipo.ID, err)
@@ -972,14 +995,16 @@ func (s *GMPHistoryService) WarmupCache(ctx context.Context) error {
 	query := `
 		SELECT id, company_code, name, status
 		FROM ipo_list
-		WHERE status IN ($2, $3, $4)
+		WHERE status IN ($2, $3, $4, $5, $6)
 		  AND (close_date IS NULL OR close_date >= $1)
 		ORDER BY 
 			CASE 
 				WHEN status = $2 THEN 1
 				WHEN status = $3 THEN 2
 				WHEN status = $4 THEN 3
-				ELSE 4
+				WHEN status = $5 THEN 4
+				WHEN status = $6 THEN 5
+				ELSE 6
 			END,
 			close_date DESC NULLS FIRST
 		LIMIT 20
@@ -987,7 +1012,7 @@ func (s *GMPHistoryService) WarmupCache(ctx context.Context) error {
 
 	// Get IPOs from last 2 months (most popular)
 	twoMonthsAgo := time.Now().AddDate(0, -2, 0)
-	rows, err := s.db.QueryContext(ctx, query, twoMonthsAgo, models.StatusLive, models.StatusUpcoming, models.StatusClosed)
+	rows, err := s.db.QueryContext(ctx, query, twoMonthsAgo, models.StatusLive, models.StatusUpcoming, models.StatusClosed, models.StatusResultOut, models.StatusListed)
 	if err != nil {
 		return fmt.Errorf("failed to query popular IPOs: %w", err)
 	}

@@ -46,6 +46,10 @@ func Run(cfg *config.Config) error {
 	}
 	defer database.Close()
 
+	if err := database.EnsureBaseSchema(db, "database/schema.sql"); err != nil {
+		return fmt.Errorf("failed to bootstrap database schema: %w", err)
+	}
+
 	if err := database.RunMigrations(db, "database/migrations"); err != nil {
 		logrus.WithError(err).Error("Goose migrations failed, continuing with existing schema")
 	}
@@ -92,6 +96,19 @@ func Run(cfg *config.Config) error {
 			return
 		}
 		logrus.Info("Cache warmed up successfully")
+	}()
+
+	// Start GMP history backfill on fresh start
+	go func() {
+		time.Sleep(5 * time.Second) // Wait for DB to be ready
+		logrus.Info("Starting initial GMP history backfill on startup")
+		results, err := gmpHistoryService.ProcessAllActiveIPOHistory()
+		if err != nil {
+			logrus.WithError(err).Error("Initial GMP history backfill failed")
+			return
+		}
+		logrus.Infof("Initial GMP history backfill completed: %d processed, %d success, %d failed",
+			results.TotalProcessed, results.SuccessCount, results.FailureCount)
 	}()
 
 	backgroundCtx, stopBackgroundJobs := context.WithCancel(context.Background())
@@ -216,9 +233,11 @@ func registerRoutes(
 	api.Get("/ipos/:id/with-gmp", ipoHandler.GetIPOByIDWithGMP)
 	api.Get("/ipos/:id", ipoHandler.GetIPOByID)
 
+	// GMP history routes
+	api.Post("/gmp/backfill", gmpHistoryHandler.BackfillGMPHistory)
 	api.Get("/gmp/history/health", gmpHistoryHandler.GetHealthCheck)
 	api.Get("/gmp/history/metrics", gmpHistoryHandler.GetServiceMetrics)
-	api.Post("/gmp/backfill", gmpHistoryHandler.BackfillGMPHistory)
+	// Parameterized routes (must be after static routes)
 	api.Get("/gmp/history/:ipo_id", gmpHistoryHandler.GetIPOPriceHistory)
 	api.Get("/gmp/history/:ipo_id/chart", gmpHistoryHandler.GetChartData)
 	api.Get("/gmp/history/:ipo_id/summary", gmpHistoryHandler.GetHistorySummary)
