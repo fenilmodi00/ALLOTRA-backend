@@ -145,15 +145,15 @@ func TestValidateHistoryEntry(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "Negative GMP value (Requirement 5.1)",
+			name: "Negative GMP value (valid - grey market discount)",
 			entry: models.GMPPriceHistoryEntry{
 				RecordDate:       time.Now(),
 				IPOPrice:         100,
 				GMPValue:         -10,
 				EstimatedListing: 90,
+				ListingPercent:   -10,
 			},
-			expectError: true,
-			errorMsg:    "GMP value cannot be negative",
+			expectError: false,
 		},
 		{
 			name: "Negative IPO price (Requirement 5.1)",
@@ -739,10 +739,9 @@ func TestValidateScrapedData(t *testing.T) {
 				PriceHistory: []models.GMPPriceHistoryEntry{
 					{
 						RecordDate:       time.Now(),
-						IPOPrice:         100.0,
-						GMPValue:         -10.0, // Invalid negative GMP
-						EstimatedListing: 90.0,
-						ListingPercent:   -10.0,
+						IPOPrice:         -100.0, // Invalid negative IPO price
+						GMPValue:         -10.0,
+						EstimatedListing: -110.0,
 					},
 				},
 			},

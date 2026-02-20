@@ -62,6 +62,7 @@ func (c *InvestorGainAPIClient) GetIPOUrlList() ([]IPOUrlEntry, error) {
 	}
 
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -90,6 +91,7 @@ func (c *InvestorGainAPIClient) GetIPOGMPData(ipoID string) ([]IPOGmpDataPoint, 
 	}
 
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

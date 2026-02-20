@@ -604,9 +604,11 @@ func (h *GMPHistoryHandler) BackfillGMPHistory(c *fiber.Ctx) error {
 		})
 	}
 
+	jobID := uuid.New().String()
+
 	// Start the backfill process in a goroutine to not block the response
 	go func() {
-		_, err := h.Service.ProcessAllActiveIPOHistory()
+		results, err := h.Service.ProcessAllActiveIPOHistory()
 		if err != nil {
 			if h.errorLogger != nil {
 				h.errorLogger.LogExternalServiceError(
@@ -615,10 +617,26 @@ func (h *GMPHistoryHandler) BackfillGMPHistory(c *fiber.Ctx) error {
 					err,
 					map[string]interface{}{
 						"operation": "backfill",
+						"job_id":    jobID,
 					},
 				)
 			}
 			return
+		}
+
+		if h.errorLogger != nil {
+			h.errorLogger.LogExternalServiceError(
+				"GMPHistoryHandler",
+				"BackfillGMPHistory.Completed",
+				nil,
+				map[string]interface{}{
+					"operation":       "backfill_complete",
+					"job_id":          jobID,
+					"total_processed": results.TotalProcessed,
+					"success_count":   results.SuccessCount,
+					"failure_count":   results.FailureCount,
+				},
+			)
 		}
 	}()
 
@@ -626,6 +644,7 @@ func (h *GMPHistoryHandler) BackfillGMPHistory(c *fiber.Ctx) error {
 		"success": true,
 		"message": "Backfill job started",
 		"data": fiber.Map{
+			"job_id":  jobID,
 			"status":  "started",
 			"message": "GMP history backfill has been initiated for all active IPOs",
 			"endpoints": fiber.Map{

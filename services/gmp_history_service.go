@@ -440,18 +440,21 @@ func (s *GMPHistoryService) ScrapeIPOPriceHistoryWithName(ipoID string, companyC
 		"ipo_id":       ipoID,
 		"ipo_name":     ipoName,
 		"company_code": companyCode,
-	}).Info("Scraping IPO price history")
+	}).Info("Scraping IPO price history via API")
 
-	// Build URL for scraping (using IPO name to find numeric ID)
-	url, err := s.scraper.BuildIPOHistoryURL(companyCode, ipoName)
+	// Scrape data from InvestorGain using API (more reliable than HTML scraping)
+	scrapedData, err := s.scraper.ScrapeHistoryFromAPI(ipoID, companyCode)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build URL: %w", err)
-	}
-
-	// Scrape data from InvestorGain
-	scrapedData, err := s.scraper.ScrapeHistoryFromURL(url)
-	if err != nil {
-		return nil, fmt.Errorf("failed to scrape history: %w", err)
+		s.logger.WithError(err).Warn("API scraping failed, falling back to URL scraping")
+		// Fallback to URL scraping if API fails
+		url, urlErr := s.scraper.BuildIPOHistoryURL(companyCode, ipoName)
+		if urlErr != nil {
+			return nil, fmt.Errorf("failed to build URL: %w", urlErr)
+		}
+		scrapedData, err = s.scraper.ScrapeHistoryFromURL(url)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scrape history: %w", err)
+		}
 	}
 
 	// Validate scraped data

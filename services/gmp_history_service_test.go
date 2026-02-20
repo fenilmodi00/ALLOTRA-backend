@@ -47,15 +47,15 @@ func TestValidateHistoryData(t *testing.T) {
 			errorMsg:  "entry is nil",
 		},
 		{
-			name: "negative GMP value",
+			name: "negative GMP value (valid - grey market discount)",
 			entry: &models.GMPPriceHistoryEntry{
 				GMPValue:         -10.0,
 				IPOPrice:         100.0,
 				EstimatedListing: 90.0,
+				ListingPercent:   -10.0,
 				RecordDate:       time.Now(),
 			},
-			wantError: true,
-			errorMsg:  "GMP value cannot be negative",
+			wantError: false,
 		},
 		{
 			name: "negative IPO price",
