@@ -129,6 +129,7 @@ type IPOBasicInfo struct {
 type ChartPoint struct {
 	Date             string  `json:"date"`
 	GMPValue         float64 `json:"gmp_value"`
+	IPOPrice         float64 `json:"ipo_price"`
 	EstimatedListing float64 `json:"estimated_listing"`
 	ListingPercent   float64 `json:"listing_percent"`
 }

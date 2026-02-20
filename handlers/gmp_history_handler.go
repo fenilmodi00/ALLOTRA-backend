@@ -323,6 +323,7 @@ func transformToChartData(history *models.GMPPriceHistoryCollection) *models.Cha
 		chartPoints = append(chartPoints, models.ChartPoint{
 			Date:             entry.RecordDate.Format("2006-01-02"),
 			GMPValue:         entry.GMPValue,
+			IPOPrice:         entry.IPOPrice,
 			EstimatedListing: entry.EstimatedListing,
 			ListingPercent:   entry.ListingPercent,
 		})
@@ -588,6 +589,50 @@ func (h *GMPHistoryHandler) GetServiceMetrics(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"success": true,
 		"data":    metrics,
+	})
+}
+
+// BackfillGMPHistory triggers a backfill of GMP history for all active IPOs
+// POST /api/v1/gmp/backfill
+// This endpoint initiates a background job to scrape GMP history for all active IPOs
+func (h *GMPHistoryHandler) BackfillGMPHistory(c *fiber.Ctx) error {
+	if h.Service == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"success": false,
+			"error":   "Service not initialized",
+			"message": "GMP history service is unavailable",
+		})
+	}
+
+	// Start the backfill process in a goroutine to not block the response
+	go func() {
+		_, err := h.Service.ProcessAllActiveIPOHistory()
+		if err != nil {
+			if h.errorLogger != nil {
+				h.errorLogger.LogExternalServiceError(
+					"GMPHistoryHandler",
+					"BackfillGMPHistory",
+					err,
+					map[string]interface{}{
+						"operation": "backfill",
+					},
+				)
+			}
+			return
+		}
+	}()
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Backfill job started",
+		"data": fiber.Map{
+			"status":  "started",
+			"message": "GMP history backfill has been initiated for all active IPOs",
+			"endpoints": fiber.Map{
+				"health":  "/api/v1/gmp/history/health",
+				"metrics": "/api/v1/gmp/history/metrics",
+			},
+		},
 	})
 }
 

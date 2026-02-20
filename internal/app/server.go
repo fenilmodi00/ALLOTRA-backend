@@ -218,6 +218,7 @@ func registerRoutes(
 
 	api.Get("/gmp/history/health", gmpHistoryHandler.GetHealthCheck)
 	api.Get("/gmp/history/metrics", gmpHistoryHandler.GetServiceMetrics)
+	api.Post("/gmp/backfill", gmpHistoryHandler.BackfillGMPHistory)
 	api.Get("/gmp/history/:ipo_id", gmpHistoryHandler.GetIPOPriceHistory)
 	api.Get("/gmp/history/:ipo_id/chart", gmpHistoryHandler.GetChartData)
 	api.Get("/gmp/history/:ipo_id/summary", gmpHistoryHandler.GetHistorySummary)

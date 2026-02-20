@@ -375,11 +375,8 @@ func (s *GMPHistoryService) ValidateHistoryData(entry *models.GMPPriceHistoryEnt
 		return fmt.Errorf("entry is nil")
 	}
 
-	// Requirement 5.1: GMP values must be non-negative
-	if entry.GMPValue < 0 {
-		return fmt.Errorf("GMP value cannot be negative: %.2f", entry.GMPValue)
-	}
-
+	// GMP can be negative (grey market discount) - this is valid data
+	// IPO price must be non-negative
 	if entry.IPOPrice < 0 {
 		return fmt.Errorf("IPO price cannot be negative: %.2f", entry.IPOPrice)
 	}

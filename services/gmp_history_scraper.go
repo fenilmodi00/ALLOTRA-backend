@@ -25,6 +25,7 @@ type GMPPriceHistoryScraper struct {
 	requestRateLimiter *shared.HTTPRequestRateLimiter
 	circuitBreaker     *shared.CircuitBreaker
 	retryConfig        shared.RetryConfig
+	apiClient          *InvestorGainAPIClient
 }
 
 // NewGMPPriceHistoryScraper creates a new GMP price history scraper
@@ -50,6 +51,7 @@ func NewGMPPriceHistoryScraper(db *sql.DB) *GMPPriceHistoryScraper {
 		requestRateLimiter: shared.NewHTTPRequestRateLimiter(config.RequestRateLimit),
 		circuitBreaker:     circuitBreaker,
 		retryConfig:        retryConfig,
+		apiClient:          NewInvestorGainAPIClient(),
 	}
 }
 
@@ -86,7 +88,6 @@ func (s *GMPPriceHistoryScraper) ScrapeHistoryFromURL(url string) (*ScrapedHisto
 	s.logger.WithField("url", url).Info("Starting GMP history scraping")
 
 	var scrapedData *ScrapedHistoryData
-	var scrapingErr error
 
 	// Execute with circuit breaker protection (Requirement 6.4)
 	circuitErr := s.circuitBreaker.Execute(func() error {
@@ -164,7 +165,183 @@ func (s *GMPPriceHistoryScraper) ScrapeHistoryFromURL(url string) (*ScrapedHisto
 		"processing_time": scrapedData.ProcessingTime,
 	}).Info("GMP history scraping completed successfully")
 
-	return scrapedData, scrapingErr
+	return scrapedData, nil
+}
+
+// ScrapeHistoryFromAPI scrapes GMP price history using the InvestorGain API
+// This is more reliable than HTML scraping as it directly accesses the JSON data
+func (s *GMPPriceHistoryScraper) ScrapeHistoryFromAPI(ipoID string, companyCode string) (*ScrapedHistoryData, error) {
+	startTime := time.Now()
+	s.logger.WithFields(logrus.Fields{
+		"ipo_id":       ipoID,
+		"company_code": companyCode,
+	}).Info("Starting GMP history scraping via API")
+
+	var scrapedData *ScrapedHistoryData
+
+	// Execute with circuit breaker protection
+	circuitErr := s.circuitBreaker.Execute(func() error {
+		// Execute with retry logic
+		retryErr := shared.RetryWithExponentialBackoff(func() error {
+			// Enforce rate limiting
+			s.requestRateLimiter.EnforceRateLimit()
+
+			// Perform the actual API scraping
+			data, err := s.performAPIScraping(ipoID, companyCode)
+			if err != nil {
+				if shared.IsRetryableError(err) {
+					s.logger.WithError(err).Warn("Retryable error occurred during API scraping")
+					return err
+				}
+				s.logger.WithError(err).Error("Non-retryable error occurred during API scraping")
+				return err
+			}
+
+			scrapedData = data
+			return nil
+		}, s.retryConfig, s.logger)
+
+		return retryErr
+	})
+
+	if circuitErr != nil {
+		if circuitErr == shared.ErrCircuitOpen {
+			if s.errorLogger != nil {
+				s.errorLogger.LogExternalServiceError(
+					"GMPPriceHistoryScraper",
+					"ScrapeHistoryFromAPI",
+					circuitErr,
+					map[string]interface{}{
+						"ipo_id":          ipoID,
+						"circuit_breaker": "investorgain-scraper",
+						"state":           "open",
+					},
+				)
+			}
+			return nil, fmt.Errorf("external service unavailable (circuit breaker open): %w", circuitErr)
+		}
+
+		if s.errorLogger != nil {
+			s.errorLogger.LogScrapingError(
+				"GMPPriceHistoryScraper",
+				"ScrapeHistoryFromAPI",
+				circuitErr,
+				map[string]interface{}{
+					"ipo_id":         ipoID,
+					"retry_attempts": s.retryConfig.MaxAttempts,
+				},
+			)
+		}
+		return nil, fmt.Errorf("API scraping failed: %w", circuitErr)
+	}
+
+	// Calculate total processing time
+	scrapedData.ProcessingTime = time.Since(startTime)
+
+	s.logger.WithFields(logrus.Fields{
+		"ipo_name":        scrapedData.IPOName,
+		"entries_found":   len(scrapedData.PriceHistory),
+		"errors":          scrapedData.ErrorCount,
+		"processing_time": scrapedData.ProcessingTime,
+	}).Info("GMP history API scraping completed successfully")
+
+	return scrapedData, nil
+}
+
+// performAPIScraping performs the actual API scraping operation
+func (s *GMPPriceHistoryScraper) performAPIScraping(ipoID, companyCode string) (*ScrapedHistoryData, error) {
+	if s.apiClient == nil {
+		return nil, fmt.Errorf("API client not initialized")
+	}
+
+	// Fetch GMP data from API
+	dataPoints, err := s.apiClient.GetIPOGMPData(ipoID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch GMP data from API: %w", err)
+	}
+
+	// Transform API data to ScrapedHistoryData
+	scrapedData := &ScrapedHistoryData{
+		CompanyCode:     companyCode,
+		LastUpdated:     time.Now(),
+		ScrapingSuccess: true,
+		ErrorCount:      0,
+		PriceHistory:    make([]models.GMPPriceHistoryEntry, 0, len(dataPoints)),
+	}
+
+	// Get IPO name from database if available
+	if s.db != nil {
+		var ipoName string
+		err := s.db.QueryRow("SELECT name FROM ipo_list WHERE id = $1", ipoID).Scan(&ipoName)
+		if err == nil {
+			scrapedData.IPOName = ipoName
+		}
+	}
+
+	// Parse each data point
+	for _, dp := range dataPoints {
+		entry, err := s.parseAPIDataPoint(dp)
+		if err != nil {
+			s.logger.WithError(err).Warn("Failed to parse API data point, skipping")
+			scrapedData.ErrorCount++
+			continue
+		}
+		entry.CompanyCode = companyCode
+		entry.IPOID = ipoID
+		scrapedData.PriceHistory = append(scrapedData.PriceHistory, entry)
+	}
+
+	if len(scrapedData.PriceHistory) == 0 {
+		return nil, fmt.Errorf("no valid price history entries found")
+	}
+
+	// Set current GMP from latest entry
+	if len(scrapedData.PriceHistory) > 0 {
+		scrapedData.CurrentGMP = scrapedData.PriceHistory[0].GMPValue
+		scrapedData.IPOPrice = scrapedData.PriceHistory[0].IPOPrice
+		if scrapedData.IPOName == "" {
+			scrapedData.IPOName = companyCode
+		}
+	}
+
+	return scrapedData, nil
+}
+
+// parseAPIDataPoint converts an API data point to a GMPPriceHistoryEntry
+func (s *GMPPriceHistoryScraper) parseAPIDataPoint(dp IPOGmpDataPoint) (models.GMPPriceHistoryEntry, error) {
+	entry := models.GMPPriceHistoryEntry{
+		ID:         uuid.New().String(),
+		DataSource: "investorgain.com",
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+
+	// Parse date
+	parsedDate, err := time.Parse("02-01-2006", dp.Date)
+	if err != nil {
+		// Try alternative format
+		parsedDate, err = time.Parse("2006-01-02", dp.Date)
+		if err != nil {
+			return entry, fmt.Errorf("failed to parse date '%s': %w", dp.Date, err)
+		}
+	}
+	entry.RecordDate = parsedDate
+
+	// Set values from API
+	entry.GMPValue = dp.GMP
+	entry.IPOPrice = dp.IPOPrice
+	entry.EstimatedListing = dp.EstimatedListing
+	entry.ListingPercent = dp.EstimatedPercent
+	entry.Sub2Sauda = dp.Sub2
+	entry.SubscriptionStatus = "Not Available"
+	entry.LastUpdated = time.Now().Format("02-01-2006 15:04")
+
+	// Calculate estimated profit (assuming 1000 shares)
+	if entry.GMPValue > 0 {
+		entry.EstimatedProfit = entry.GMPValue * 1000
+	}
+
+	return entry, nil
 }
 
 // performScraping performs the actual web scraping operation
@@ -1128,11 +1305,7 @@ func (s *GMPPriceHistoryScraper) ValidateScrapedData(data *ScrapedHistoryData) e
 func (s *GMPPriceHistoryScraper) validateHistoryEntryLenient(entry *models.GMPPriceHistoryEntry) error {
 	logger := s.getLogger()
 
-	// Basic non-negative validation
-	if entry.GMPValue < 0 {
-		return fmt.Errorf("GMP value cannot be negative: %.2f", entry.GMPValue)
-	}
-
+	// GMP can be negative (grey market discount), but IPO price must be non-negative
 	if entry.IPOPrice < 0 {
 		return fmt.Errorf("IPO price cannot be negative: %.2f", entry.IPOPrice)
 	}
@@ -1182,11 +1355,8 @@ func (s *GMPPriceHistoryScraper) validateHistoryEntryLenient(entry *models.GMPPr
 // validateHistoryEntry validates a single history entry
 // Implements Requirements 5.1, 5.2, 5.3, 5.4 - Data validation rules
 func (s *GMPPriceHistoryScraper) validateHistoryEntry(entry *models.GMPPriceHistoryEntry) error {
-	// Requirement 5.1: GMP values must be non-negative
-	if entry.GMPValue < 0 {
-		return fmt.Errorf("GMP value cannot be negative: %.2f", entry.GMPValue)
-	}
-
+	// GMP can be negative (grey market discount) - this is valid data
+	// IPO price must be non-negative
 	if entry.IPOPrice < 0 {
 		return fmt.Errorf("IPO price cannot be negative: %.2f", entry.IPOPrice)
 	}
