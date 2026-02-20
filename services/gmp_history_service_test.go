@@ -1,11 +1,11 @@
 package services
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/fenilmodi00/ipo-backend/models"
-	_ "github.com/lib/pq"
 )
 
 // TestNewGMPHistoryService tests service initialization
@@ -158,7 +158,7 @@ func TestValidateHistoryData(t *testing.T) {
 			if tt.wantError {
 				if err == nil {
 					t.Errorf("Expected error containing '%s', got nil", tt.errorMsg)
-				} else if tt.errorMsg != "" && !contains(err.Error(), tt.errorMsg) {
+				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
 					t.Errorf("Expected error containing '%s', got '%s'", tt.errorMsg, err.Error())
 				}
 			} else {
@@ -179,7 +179,7 @@ func TestSavePriceHistory_NilCollection(t *testing.T) {
 		t.Error("Expected error for nil collection, got nil")
 	}
 
-	if !contains(err.Error(), "history collection is nil") {
+	if !strings.Contains(err.Error(), "history collection is nil") {
 		t.Errorf("Expected error about nil collection, got: %v", err)
 	}
 }
@@ -209,15 +209,9 @@ func TestGetPriceHistoryByIPO_EmptyIPOID(t *testing.T) {
 		t.Error("Expected error for empty IPO ID, got nil")
 	}
 
-	if !contains(err.Error(), "ipo_id is required") {
+	if !strings.Contains(err.Error(), "ipo_id is required") {
 		t.Errorf("Expected error about required IPO ID, got: %v", err)
 	}
-}
-
-// TestArchiveOldHistory_ValidCutoffDate tests archival with valid cutoff date
-func TestArchiveOldHistory_ValidCutoffDate(t *testing.T) {
-	// This test requires a database connection, so we skip it if DB is not available
-	t.Skip("Skipping test that requires database connection")
 }
 
 // TestProcessingMetrics tests the ProcessingMetrics structure
@@ -316,129 +310,6 @@ func TestJoinStrings(t *testing.T) {
 	}
 }
 
-// TestErrorIsolation tests that errors in individual IPO processing don't stop the batch
-func TestErrorIsolation(t *testing.T) {
-	// This test verifies the concept of error isolation
-	// In the actual implementation, if one IPO fails, processing continues with the next
-
-	type ipoResult struct {
-		ipoID   string
-		success bool
-		err     error
-	}
-
-	// Simulate processing multiple IPOs with some failures
-	ipos := []string{"IPO1", "IPO2", "IPO3", "IPO4", "IPO5"}
-	results := make([]ipoResult, 0)
-
-	// Simulate processing with error isolation
-	for i, ipoID := range ipos {
-		var result ipoResult
-		result.ipoID = ipoID
-
-		// Simulate failure for IPO2 and IPO4
-		if i == 1 || i == 3 {
-			result.success = false
-			result.err = &testError{msg: "simulated error"}
-		} else {
-			result.success = true
-			result.err = nil
-		}
-
-		results = append(results, result)
-		// Continue processing even if there's an error (error isolation)
-	}
-
-	// Verify all IPOs were processed
-	if len(results) != len(ipos) {
-		t.Errorf("Expected %d results, got %d", len(ipos), len(results))
-	}
-
-	// Count successes and failures
-	successCount := 0
-	errorCount := 0
-	for _, result := range results {
-		if result.success {
-			successCount++
-		} else {
-			errorCount++
-		}
-	}
-
-	// Verify error isolation worked
-	if successCount != 3 {
-		t.Errorf("Expected 3 successful IPOs, got %d", successCount)
-	}
-
-	if errorCount != 2 {
-		t.Errorf("Expected 2 failed IPOs, got %d", errorCount)
-	}
-}
-
-// TestPriorityBasedProcessing tests IPO prioritization logic
-func TestPriorityBasedProcessing(t *testing.T) {
-	// This test verifies the priority ordering concept
-	// LIVE IPOs should be processed before UPCOMING, which should be before CLOSED
-
-	type ipo struct {
-		id     string
-		status string
-	}
-
-	ipos := []ipo{
-		{id: "IPO1", status: "CLOSED"},
-		{id: "IPO2", status: "LIVE"},
-		{id: "IPO3", status: "UPCOMING"},
-		{id: "IPO4", status: "LIVE"},
-		{id: "IPO5", status: "CLOSED"},
-	}
-
-	// Sort by priority (simulating the ORDER BY clause in the query)
-	priorityMap := map[string]int{
-		"LIVE":     1,
-		"UPCOMING": 2,
-		"CLOSED":   3,
-	}
-
-	// Simple bubble sort for testing
-	for i := 0; i < len(ipos); i++ {
-		for j := i + 1; j < len(ipos); j++ {
-			if priorityMap[ipos[i].status] > priorityMap[ipos[j].status] {
-				ipos[i], ipos[j] = ipos[j], ipos[i]
-			}
-		}
-	}
-
-	// Verify priority order
-	expectedOrder := []string{"LIVE", "LIVE", "UPCOMING", "CLOSED", "CLOSED"}
-	for i, ipo := range ipos {
-		if ipo.status != expectedOrder[i] {
-			t.Errorf("Position %d: expected status %s, got %s", i, expectedOrder[i], ipo.status)
-		}
-	}
-
-	// Verify LIVE IPOs come first
-	if ipos[0].status != "LIVE" || ipos[1].status != "LIVE" {
-		t.Error("Expected LIVE IPOs to be processed first")
-	}
-
-	// Verify UPCOMING comes before CLOSED
-	upcomingIndex := -1
-	closedIndex := -1
-	for i, ipo := range ipos {
-		if ipo.status == "UPCOMING" && upcomingIndex == -1 {
-			upcomingIndex = i
-		}
-		if ipo.status == "CLOSED" && closedIndex == -1 {
-			closedIndex = i
-		}
-	}
-
-	if upcomingIndex >= closedIndex {
-		t.Error("Expected UPCOMING IPOs to be processed before CLOSED IPOs")
-	}
-}
-
 // TestMetricsTracking tests comprehensive metrics tracking
 func TestMetricsTracking(t *testing.T) {
 	startTime := time.Now()
@@ -502,30 +373,6 @@ func TestMetricsTracking(t *testing.T) {
 	if successRate != 60.0 {
 		t.Errorf("Expected success rate 60%%, got %.2f%%", successRate)
 	}
-}
-
-// testError is a simple error type for testing
-type testError struct {
-	msg string
-}
-
-func (e *testError) Error() string {
-	return e.msg
-}
-
-// Helper function to check if a string contains a substring
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > 0 && len(substr) > 0 && containsHelper(s, substr)))
-}
-
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
 
 // TestCacheInitialization tests that cache is properly initialized
