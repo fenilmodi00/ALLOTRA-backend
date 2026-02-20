@@ -7,6 +7,7 @@ import (
 
 	"github.com/fenilmodi00/ipo-backend/jobs"
 	"github.com/fenilmodi00/ipo-backend/models"
+	"github.com/fenilmodi00/ipo-backend/repositories"
 	"github.com/gofiber/fiber/v2"
 	"github.com/sirupsen/logrus"
 )
@@ -26,7 +27,7 @@ type GMPHistoryJobRunner interface {
 }
 
 type AdminHandler struct {
-	DB            *sql.DB
+	GMPRepo       repositories.GMPRepository
 	IPOService    IPOAdminService
 	GMPJob        GMPJobRunner
 	GMPHistoryJob GMPHistoryJobRunner
@@ -34,7 +35,7 @@ type AdminHandler struct {
 
 func NewAdminHandler(db *sql.DB, ipoService IPOAdminService, gmpJob GMPJobRunner, gmpHistoryJob GMPHistoryJobRunner) *AdminHandler {
 	return &AdminHandler{
-		DB:            db,
+		GMPRepo:       repositories.NewSQLGMPRepository(db),
 		IPOService:    ipoService,
 		GMPJob:        gmpJob,
 		GMPHistoryJob: gmpHistoryJob,
@@ -98,47 +99,18 @@ func (h *AdminHandler) TriggerGMPUpdate(c *fiber.Ctx) error {
 
 // GetGMPData returns all GMP data in the database for debugging
 func (h *AdminHandler) GetGMPData(c *fiber.Ctx) error {
-	if h.DB == nil {
+	if h.GMPRepo == nil {
 		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
 			"success": false,
-			"error":   "Database unavailable",
+			"error":   "GMP repository unavailable",
 		})
 	}
 
-	query := `
-		SELECT ipo_name, company_code, gmp_value, gain_percent, estimated_listing, last_updated
-		FROM ipo_gmp 
-		ORDER BY last_updated DESC
-		LIMIT 20
-	`
-
-	rows, err := h.DB.QueryContext(c.Context(), query)
+	gmpData, err := h.GMPRepo.ListRecent(c.Context(), 20)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"success": false,
 			"error":   "Failed to query GMP data: " + err.Error(),
-		})
-	}
-	defer rows.Close()
-
-	var gmpData []map[string]interface{}
-	for rows.Next() {
-		var ipoName, companyCode string
-		var gmpValue, gainPercent, estimatedListing float64
-		var lastUpdated time.Time
-
-		err := rows.Scan(&ipoName, &companyCode, &gmpValue, &gainPercent, &estimatedListing, &lastUpdated)
-		if err != nil {
-			continue
-		}
-
-		gmpData = append(gmpData, map[string]interface{}{
-			"ipo_name":          ipoName,
-			"company_code":      companyCode,
-			"gmp_value":         gmpValue,
-			"gain_percent":      gainPercent,
-			"estimated_listing": estimatedListing,
-			"last_updated":      lastUpdated,
 		})
 	}
 

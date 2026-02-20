@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"crypto/subtle"
+	"database/sql"
 	"fmt"
 	"os"
 	"os/signal"
@@ -39,13 +40,14 @@ func Run(cfg *config.Config) error {
 		return fmt.Errorf("DATABASE_URL is required")
 	}
 
-	if err := database.Connect(cfg.DatabaseURL); err != nil {
+	db, err := database.ConnectDB(cfg.DatabaseURL)
+	if err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 	defer database.Close()
 
-	if err := database.Migrate("database/schema.sql"); err != nil {
-		logrus.WithError(err).Error("Migration failed, continuing with existing schema")
+	if err := database.RunMigrations(db, "database/migrations"); err != nil {
+		logrus.WithError(err).Error("Goose migrations failed, continuing with existing schema")
 	}
 
 	cacheConfig := config.DefaultCacheConfig()
@@ -56,10 +58,10 @@ func Run(cfg *config.Config) error {
 	utilityService := services.NewUtilityService()
 	scrapingService := services.NewChittorgarhIPOScrapingService(nil)
 	allotmentChecker := services.NewAllotmentChecker()
-	ipoService := services.NewIPOService(database.DB)
+	ipoService := services.NewIPOService(db)
 
 	cacheService := services.NewCacheServiceWithConfig(
-		database.DB,
+		db,
 		cacheConfig.DefaultTTL,
 		cacheConfig.MaxSize,
 	)
@@ -70,18 +72,18 @@ func Run(cfg *config.Config) error {
 	dailyJob := jobs.NewDailyIPOUpdateJob(scrapingService, ipoService, utilityService)
 	resultJob := jobs.NewResultReleaseCheckJob(ipoService)
 	cleanupJob := jobs.NewCacheCleanupJob(cacheService)
-	gmpJob := jobs.NewGMPUpdateJob(database.DB)
-	gmpHistoryService := services.NewGMPHistoryService(database.DB)
-	gmpHistoryJob := jobs.NewGMPHistoryUpdateJobWithService(database.DB, gmpHistoryService)
+	gmpJob := jobs.NewGMPUpdateJob(db)
+	gmpHistoryService := services.NewGMPHistoryService(db)
+	gmpHistoryJob := jobs.NewGMPHistoryUpdateJobWithService(db, gmpHistoryService)
 
 	ipoHandler := handlers.NewIPOHandler(ipoService)
 	cacheHandler := handlers.NewCacheHandler(cacheService)
-	adminHandler := handlers.NewAdminHandler(database.DB, ipoService, gmpJob, gmpHistoryJob)
+	adminHandler := handlers.NewAdminHandler(db, ipoService, gmpJob, gmpHistoryJob)
 	checkHandler := handlers.NewCheckHandler(ipoService, allotmentChecker, cacheService)
 	marketHandler := handlers.NewMarketHandler()
-	gmpHandler := handlers.NewGMPHandler(database.DB, gmpHistoryService)
+	gmpHandler := handlers.NewGMPHandler(db, gmpHistoryService)
 	gmpHistoryHandler := handlers.NewGMPHistoryHandler(gmpHistoryService)
-	performanceHandler := handlers.NewPerformanceHandler(database.DB, ipoService, cachedIPOService)
+	performanceHandler := handlers.NewPerformanceHandler(db, ipoService, cachedIPOService)
 
 	go func() {
 		time.Sleep(2 * time.Second)
@@ -93,13 +95,14 @@ func Run(cfg *config.Config) error {
 	}()
 
 	backgroundCtx, stopBackgroundJobs := context.WithCancel(context.Background())
+	defer stopBackgroundJobs()
 	var backgroundWG sync.WaitGroup
 
 	startBackgroundJobs(backgroundCtx, &backgroundWG, dailyJob, resultJob, cleanupJob, gmpJob, gmpHistoryJob)
 
 	app := fiber.New(fiber.Config{BodyLimit: 4 * 1024 * 1024})
 	registerMiddleware(app)
-	registerRoutes(app, cfg, ipoHandler, cacheHandler, adminHandler, checkHandler, marketHandler, gmpHandler, gmpHistoryHandler, performanceHandler)
+	registerRoutes(app, db, cfg, ipoHandler, cacheHandler, adminHandler, checkHandler, marketHandler, gmpHandler, gmpHistoryHandler, performanceHandler)
 
 	serverErrors := make(chan error, 1)
 	go func() {
@@ -121,7 +124,6 @@ func Run(cfg *config.Config) error {
 		}
 	}
 
-	stopBackgroundJobs()
 	gmpJob.Stop()
 	gmpHistoryJob.Stop()
 	backgroundWG.Wait()
@@ -157,6 +159,7 @@ func registerMiddleware(app *fiber.App) {
 
 func registerRoutes(
 	app *fiber.App,
+	db *sql.DB,
 	cfg *config.Config,
 	ipoHandler *handlers.IPOHandler,
 	cacheHandler *handlers.CacheHandler,
@@ -171,7 +174,7 @@ func registerRoutes(
 		pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
-		dbErr := database.DB.PingContext(pingCtx)
+		dbErr := db.PingContext(pingCtx)
 		status := "ok"
 		statusCode := fiber.StatusOK
 		details := fiber.Map{"database": "ok"}
@@ -193,7 +196,7 @@ func registerRoutes(
 		pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
-		if err := database.DB.PingContext(pingCtx); err != nil {
+		if err := db.PingContext(pingCtx); err != nil {
 			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
 				"status":  "not_ready",
 				"reason":  "database_unreachable",

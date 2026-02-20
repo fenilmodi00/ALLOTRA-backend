@@ -5,12 +5,14 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/fenilmodi00/ipo-backend/repositories"
 	"github.com/fenilmodi00/ipo-backend/services"
 	"github.com/gofiber/fiber/v2"
 )
 
 type PerformanceHandler struct {
 	DB               *sql.DB
+	DiagnosticsRepo  repositories.DiagnosticsRepository
 	IPOService       *services.IPOService
 	CachedIPOService *services.CachedIPOService
 }
@@ -18,6 +20,7 @@ type PerformanceHandler struct {
 func NewPerformanceHandler(db *sql.DB, ipoService *services.IPOService, cachedIPOService *services.CachedIPOService) *PerformanceHandler {
 	return &PerformanceHandler{
 		DB:               db,
+		DiagnosticsRepo:  repositories.NewSQLDiagnosticsRepository(db),
 		IPOService:       ipoService,
 		CachedIPOService: cachedIPOService,
 	}
@@ -79,7 +82,7 @@ func (h *PerformanceHandler) GetPerformanceMetrics(c *fiber.Ctx) error {
 	}
 
 	// Test 4: Index usage statistics
-	indexStats, err := h.getIndexUsageStats(ctx)
+	indexStats, err := h.DiagnosticsRepo.GetIndexUsageStats(ctx)
 	if err != nil {
 		metrics["index_stats_error"] = err.Error()
 	} else {
@@ -159,7 +162,7 @@ func (h *PerformanceHandler) RunPerformanceTest(c *fiber.Ctx) error {
 	}
 
 	// Test 3: Query plan analysis
-	queryPlans, err := h.analyzeQueryPlans(ctx)
+	queryPlans, err := h.DiagnosticsRepo.AnalyzeQueryPlans(ctx, "")
 	if err != nil {
 		results["query_plan_error"] = err.Error()
 	} else {
@@ -215,95 +218,4 @@ func (h *PerformanceHandler) WarmupCache(c *fiber.Ctx) error {
 		"success": false,
 		"message": "Cache service not available",
 	})
-}
-
-// getIndexUsageStats retrieves database index usage statistics
-func (h *PerformanceHandler) getIndexUsageStats(ctx context.Context) ([]map[string]interface{}, error) {
-	query := `
-		SELECT 
-			schemaname,
-			relname as table_name,
-			indexrelname as index_name,
-			idx_scan as scans,
-			idx_tup_read as tuples_read,
-			idx_tup_fetch as tuples_fetched
-		FROM pg_stat_user_indexes
-		WHERE relname IN ('ipo_list', 'ipo_gmp')
-		ORDER BY relname, idx_scan DESC
-	`
-
-	rows, err := h.DB.QueryContext(ctx, query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var stats []map[string]interface{}
-
-	for rows.Next() {
-		var schema, table, index string
-		var scans, tuplesRead, tuplesFetched int64
-
-		if err := rows.Scan(&schema, &table, &index, &scans, &tuplesRead, &tuplesFetched); err != nil {
-			return nil, err
-		}
-
-		stats = append(stats, map[string]interface{}{
-			"schema":         schema,
-			"table":          table,
-			"index":          index,
-			"scans":          scans,
-			"tuples_read":    tuplesRead,
-			"tuples_fetched": tuplesFetched,
-		})
-	}
-
-	return stats, nil
-}
-
-// analyzeQueryPlans analyzes execution plans for key queries
-func (h *PerformanceHandler) analyzeQueryPlans(ctx context.Context) (map[string][]string, error) {
-	queries := map[string]string{
-		"active_ipos_with_gmp": `
-			EXPLAIN (FORMAT TEXT)
-			SELECT i.*, g.gmp_value, g.gain_percent
-			FROM ipo_list i
-			LEFT JOIN ipo_gmp g ON i.company_code = g.company_code
-			WHERE i.status = 'LIVE' OR i.status = 'RESULT_OUT'
-			ORDER BY i.created_at DESC
-			LIMIT 10
-		`,
-		"single_ipo_with_gmp": `
-			EXPLAIN (FORMAT TEXT)
-			SELECT i.*, g.gmp_value, g.gain_percent
-			FROM ipo_list i
-			LEFT JOIN ipo_gmp g ON i.company_code = g.company_code
-			WHERE i.id = $1
-		`,
-	}
-
-	plans := make(map[string][]string)
-
-	for name, query := range queries {
-		rows, err := h.DB.QueryContext(ctx, query)
-		if err != nil {
-			plans[name] = []string{"Error: " + err.Error()}
-			continue
-		}
-
-		var planLines []string
-		for rows.Next() {
-			var line string
-			if err := rows.Scan(&line); err != nil {
-				rows.Close()
-				return nil, err
-			}
-			planLines = append(planLines, line)
-		}
-		rows.Close()
-
-		plans[name] = planLines
-	}
-
-	return plans, nil
 }

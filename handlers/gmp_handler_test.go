@@ -388,7 +388,7 @@ func TestBackwardCompatibility_ResponseStructure(t *testing.T) {
 func TestGMPHandler_NilHistoryService(t *testing.T) {
 	// Create handler without history service (backward compatibility)
 	handler := &GMPHandler{
-		DB:             nil, // Would be a real DB in production
+		Repo:           nil, // Would be a real repository in production
 		HistoryService: nil,
 	}
 

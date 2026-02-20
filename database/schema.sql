@@ -126,6 +126,7 @@ CREATE INDEX idx_ipo_recent ON ipo_list(created_at DESC, status) WHERE created_a
 CREATE TABLE ipo_gmp (
     id VARCHAR(100) PRIMARY KEY,
     ipo_name VARCHAR(255) NOT NULL UNIQUE,
+    ipo_id UUID,
     company_code VARCHAR(50) NOT NULL,
     ipo_price DECIMAL(10, 2) NOT NULL,
     gmp_value DECIMAL(10, 2) NOT NULL,
@@ -146,6 +147,12 @@ CREATE TABLE ipo_gmp (
     data_source VARCHAR(100) DEFAULT 'investorgain.com',
     extraction_metadata JSONB DEFAULT '{}'
 );
+
+ALTER TABLE ipo_gmp
+    ADD CONSTRAINT fk_ipo_gmp_ipo_id
+    FOREIGN KEY (ipo_id)
+    REFERENCES ipo_list(id)
+    ON DELETE SET NULL;
 
 -- Add constraints for GMP table
 ALTER TABLE ipo_gmp ADD CONSTRAINT ipo_gmp_ipo_name_not_empty CHECK (ipo_name != '');
@@ -201,12 +208,11 @@ ALTER TABLE ipo_update_log ADD CONSTRAINT ipo_update_log_field_name_not_empty CH
 
 -- GMP table indexes
 CREATE INDEX idx_ipo_gmp_company_code ON ipo_gmp(company_code);
-CREATE INDEX idx_ipo_gmp_ipo_name ON ipo_gmp(ipo_name);
 CREATE INDEX idx_ipo_gmp_last_updated ON ipo_gmp(last_updated DESC);
 CREATE INDEX idx_ipo_gmp_listing_date ON ipo_gmp(listing_date) WHERE listing_date IS NOT NULL;
 CREATE INDEX idx_ipo_gmp_stock_id ON ipo_gmp(stock_id) WHERE stock_id IS NOT NULL;
 CREATE INDEX idx_ipo_gmp_ipo_status ON ipo_gmp(ipo_status) WHERE ipo_status IS NOT NULL;
-CREATE INDEX idx_ipo_gmp_data_source ON ipo_gmp(data_source) WHERE data_source IS NOT NULL;
+CREATE INDEX idx_ipo_gmp_ipo_id ON ipo_gmp(ipo_id) WHERE ipo_id IS NOT NULL;
 
 -- Result cache table indexes
 CREATE INDEX idx_ipo_result_cache_pan_hash ON ipo_result_cache(pan_hash);
@@ -219,7 +225,6 @@ CREATE UNIQUE INDEX idx_ipo_result_cache_pan_ipo ON ipo_result_cache(pan_hash, i
 -- Update log table indexes
 CREATE INDEX idx_ipo_update_log_ipo_id ON ipo_update_log(ipo_id);
 CREATE INDEX idx_ipo_update_log_timestamp ON ipo_update_log(timestamp DESC);
-CREATE INDEX idx_ipo_update_log_field_name ON ipo_update_log(field_name);
 CREATE INDEX idx_ipo_update_log_source ON ipo_update_log(source) WHERE source IS NOT NULL;
 
 -- GMP Price History table for storing historical GMP data over time

@@ -553,12 +553,13 @@ func (s *SimpleGMPService) SaveGMPData(gmpList []models.EnhancedGMPData) error {
 	// Prepare insert statement with all fields
 	stmt, err := tx.Prepare(`
 		INSERT INTO ipo_gmp (
-			id, ipo_name, company_code, ipo_price, gmp_value, 
+			id, ipo_name, ipo_id, company_code, ipo_price, gmp_value,
 			estimated_listing, gain_percent, sub2, kostak, last_updated, 
 			data_source, stock_id, subscription_status, listing_gain, 
 			ipo_status, extraction_metadata
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 		ON CONFLICT (ipo_name) DO UPDATE SET
+			ipo_id = COALESCE(EXCLUDED.ipo_id, ipo_gmp.ipo_id),
 			gmp_value = EXCLUDED.gmp_value,
 			gain_percent = EXCLUDED.gain_percent,
 			estimated_listing = EXCLUDED.estimated_listing,
@@ -582,7 +583,7 @@ func (s *SimpleGMPService) SaveGMPData(gmpList []models.EnhancedGMPData) error {
 		}
 
 		_, err := stmt.Exec(
-			gmp.ID, gmp.IPOName, gmp.CompanyCode, gmp.IPOPrice,
+			gmp.ID, gmp.IPOName, gmp.IPOID, gmp.CompanyCode, gmp.IPOPrice,
 			gmp.GMPValue, gmp.EstimatedListing, gmp.GainPercent,
 			gmp.Sub2, gmp.Kostak, gmp.LastUpdated, gmp.DataSource,
 			gmp.StockID, gmp.SubscriptionStatus, gmp.ListingGain,
@@ -590,7 +591,7 @@ func (s *SimpleGMPService) SaveGMPData(gmpList []models.EnhancedGMPData) error {
 		)
 		if err != nil {
 			s.logger.WithError(err).WithField("company", gmp.IPOName).Error("Failed to save GMP record")
-			continue
+			return fmt.Errorf("failed to save GMP record for %s: %w", gmp.IPOName, err)
 		}
 	}
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fenilmodi00/ipo-backend/models"
 	"github.com/fenilmodi00/ipo-backend/shared"
 	"github.com/gocolly/colly/v2"
 	"github.com/sirupsen/logrus"
@@ -756,7 +757,7 @@ func (s *UtilityService) CalculateIPOStatus(openDate, closeDate, listingDate *ti
 
 	// If we have a close date and it's passed, IPO is closed
 	if closeDate != nil && now.After(*closeDate) {
-		return "CLOSED"
+		return models.StatusClosed
 	}
 
 	// If we have an open date and it's passed but close date hasn't, IPO is active
@@ -766,7 +767,7 @@ func (s *UtilityService) CalculateIPOStatus(openDate, closeDate, listingDate *ti
 
 	// If we have an open date and it's in the future, IPO is upcoming
 	if openDate != nil && now.Before(*openDate) {
-		return "UPCOMING"
+		return models.StatusUpcoming
 	}
 
 	// If we don't have enough date information, return unknown
@@ -851,7 +852,7 @@ func (s *UtilityService) GetMetricsSnapshot() map[string]interface{} {
 	if s.serviceMetrics != nil {
 		snapshot := s.serviceMetrics.GetSnapshot()
 		return map[string]interface{}{
-			"service_metrics": snapshot,
+			"service_metrics": &snapshot,
 		}
 	}
 	return make(map[string]interface{})

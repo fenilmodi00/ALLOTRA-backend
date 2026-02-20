@@ -617,6 +617,8 @@ func (s *IPOService) CalculateRiskMetrics(ipo *models.IPO) map[string]interface{
 
 // GetIPOsWithOptimizedQuery retrieves IPOs using optimized query patterns
 func (s *IPOService) GetIPOsWithOptimizedQuery(ctx context.Context, status string, limit, offset int) ([]models.IPO, error) {
+	limit, offset = normalizePagination(limit, offset)
+
 	// Use prepared statement for better performance
 	baseQuery := `SELECT id, name, company_code, description, price_band_low, price_band_high, 
               issue_size, open_date, close_date, result_date, registrar, stock_id, 
@@ -635,15 +637,15 @@ func (s *IPOService) GetIPOsWithOptimizedQuery(ctx context.Context, status strin
 		switch status {
 		case "live":
 			conditions = append(conditions, fmt.Sprintf("status = $%d", argIndex))
-			args = append(args, "LIVE")
+			args = append(args, models.StatusLive)
 			argIndex++
 		case "upcoming":
 			conditions = append(conditions, fmt.Sprintf("status = $%d", argIndex))
-			args = append(args, "UPCOMING")
+			args = append(args, models.StatusUpcoming)
 			argIndex++
 		case "closed":
 			conditions = append(conditions, fmt.Sprintf("status IN ($%d, $%d)", argIndex, argIndex+1))
-			args = append(args, "CLOSED", "RESULT_OUT")
+			args = append(args, models.StatusClosed, models.StatusResultOut)
 			argIndex += 2
 		}
 	}
@@ -717,15 +719,21 @@ func (s *IPOService) GetIPOsWithOptimizedQuery(ctx context.Context, status strin
 }
 
 func (s *IPOService) GetActiveIPOs(ctx context.Context) ([]models.IPO, error) {
+	return s.GetActiveIPOsPaginated(ctx, 50, 0)
+}
+
+func (s *IPOService) GetActiveIPOsPaginated(ctx context.Context, limit, offset int) ([]models.IPO, error) {
+	limit, offset = normalizePagination(limit, offset)
+
 	// Optimized query with IN clause instead of OR - including all fields
 	query := `SELECT id, name, company_code, description, price_band_low, price_band_high, 
               issue_size, open_date, close_date, result_date, registrar, stock_id, 
               form_url, form_fields, form_headers, parser_config, status, subscription_status,
               symbol, slug, listing_date, listing_gain, min_qty, min_amount,
               logo_url, about, strengths, risks, created_at, updated_at, created_by
-              FROM ipo_list WHERE status IN ('LIVE', 'RESULT_OUT') ORDER BY created_at DESC LIMIT 100`
+              FROM ipo_list WHERE status IN ($1, $2) ORDER BY created_at DESC LIMIT $3 OFFSET $4`
 
-	rows, err := s.DB.QueryContext(ctx, query)
+	rows, err := s.DB.QueryContext(ctx, query, models.StatusLive, models.StatusResultOut, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query active IPOs: %w", err)
 	}
@@ -760,65 +768,20 @@ func (s *IPOService) GetActiveIPOs(ctx context.Context) ([]models.IPO, error) {
 }
 
 func (s *IPOService) GetIPOs(ctx context.Context, status string) ([]models.IPO, error) {
-	baseQuery := `SELECT id, name, company_code, description, price_band_low, price_band_high, 
-              issue_size, open_date, close_date, result_date, registrar, stock_id, 
-              form_url, form_fields, form_headers, parser_config, status, subscription_status,
-              symbol, slug, listing_date, listing_gain, min_qty, min_amount,
-              logo_url, about, strengths, risks, created_at, updated_at, created_by
-              FROM ipo_list`
+	return s.GetIPOsWithOptimizedQuery(ctx, status, 50, 0)
+}
 
-	var query string
-	var args []interface{}
-
-	// Handle status filtering
-	switch status {
-	case "live":
-		query = baseQuery + ` WHERE status = 'LIVE'`
-	case "upcoming":
-		query = baseQuery + ` WHERE status = 'UPCOMING'`
-	case "closed":
-		query = baseQuery + ` WHERE status = 'CLOSED' OR status = 'RESULT_OUT'`
-	case "all", "":
-		query = baseQuery // No filter, return all
-	default:
-		// If an invalid status is provided, treat it as "all"
-		query = baseQuery
+func normalizePagination(limit, offset int) (int, int) {
+	if limit <= 0 {
+		limit = 50
 	}
-
-	query += ` ORDER BY created_at DESC`
-
-	rows, err := s.DB.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query IPOs: %w", err)
+	if limit > 200 {
+		limit = 200
 	}
-	defer rows.Close()
-
-	var ipos []models.IPO
-	for rows.Next() {
-		var ipo models.IPO
-		var formFields, formHeaders, parserConfig, strengths, risks []byte
-		err := rows.Scan(
-			&ipo.ID, &ipo.Name, &ipo.CompanyCode, &ipo.Description, &ipo.PriceBandLow, &ipo.PriceBandHigh,
-			&ipo.IssueSize, &ipo.OpenDate, &ipo.CloseDate, &ipo.ResultDate, &ipo.Registrar, &ipo.StockID,
-			&ipo.FormURL, &formFields, &formHeaders, &parserConfig, &ipo.Status, &ipo.SubscriptionStatus,
-			&ipo.Symbol, &ipo.Slug, &ipo.ListingDate, &ipo.ListingGain, &ipo.MinQty, &ipo.MinAmount,
-			&ipo.LogoURL, &ipo.About, &strengths, &risks, &ipo.CreatedAt, &ipo.UpdatedAt, &ipo.CreatedBy,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan IPO row: %w", err)
-		}
-		ipo.FormFields = json.RawMessage(formFields)
-		ipo.FormHeaders = json.RawMessage(formHeaders)
-		ipo.ParserConfig = json.RawMessage(parserConfig)
-		ipo.Strengths = json.RawMessage(strengths)
-		ipo.Risks = json.RawMessage(risks)
-
-		// Recalculate status based on current time
-		s.recalculateStatus(&ipo)
-
-		ipos = append(ipos, ipo)
+	if offset < 0 {
+		offset = 0
 	}
-	return ipos, nil
+	return limit, offset
 }
 
 func (s *IPOService) GetIPOByID(ctx context.Context, id string) (*models.IPO, error) {
@@ -1048,10 +1011,16 @@ func (s *IPOService) UpsertIPO(ctx context.Context, item models.IPO) error {
 	return err
 }
 
-// GetActiveIPOsWithGMP returns all IPOs that have GMP data available, joined by company_code or name
-// Uses INNER JOIN to ensure only IPOs with corresponding GMP data are returned
-// Matches on: company_code OR case-insensitive name comparison
+// GetActiveIPOsWithGMP returns IPOs that have GMP data available.
+// Matching priority: stock_id, then company_code, then exact normalized IPO name.
+// This avoids expensive fuzzy joins that can cause request timeouts.
 func (s *IPOService) GetActiveIPOsWithGMP(ctx context.Context) ([]models.IPOWithGMP, error) {
+	return s.GetActiveIPOsWithGMPPaginated(ctx, 50, 0)
+}
+
+func (s *IPOService) GetActiveIPOsWithGMPPaginated(ctx context.Context, limit, offset int) ([]models.IPOWithGMP, error) {
+	limit, offset = normalizePagination(limit, offset)
+
 	// Query to get all IPOs that have corresponding GMP data (INNER JOIN ensures only IPOs with GMP data)
 	query := `
 		SELECT 
@@ -1065,28 +1034,19 @@ func (s *IPOService) GetActiveIPOsWithGMP(ctx context.Context) ([]models.IPOWith
 			g.data_source, g.extraction_metadata
 		FROM ipo_list i
 		INNER JOIN ipo_gmp g ON (
-			-- Primary: Use stock_id for linking when available
-			(i.stock_id IS NOT NULL AND g.stock_id IS NOT NULL AND i.stock_id = g.stock_id)
-			-- Fallback: Exact company code match
-			OR i.company_code = g.company_code 
-			-- Fallback: Exact name match
-			OR LOWER(TRIM(i.name)) = LOWER(TRIM(g.ipo_name))
-			-- Fuzzy matching: Remove common suffixes and check if names contain each other
-			OR LOWER(REPLACE(REPLACE(REPLACE(REPLACE(i.name, ' Ltd.', ''), ' Limited', ''), ' IPO', ''), ' Inc.', '')) 
-			   LIKE '%' || LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(g.ipo_name, ' Ltd.', ''), ' Limited', ''), ' IPO', ''), ' BSE SME', ''), ' NSE SME', ''), ' L@', '')) || '%'
-			-- Reverse fuzzy matching
-			OR LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(g.ipo_name, ' Ltd.', ''), ' Limited', ''), ' IPO', ''), ' BSE SME', ''), ' NSE SME', ''), ' L@', '')) 
-			   LIKE '%' || LOWER(REPLACE(REPLACE(REPLACE(REPLACE(i.name, ' Ltd.', ''), ' Limited', ''), ' IPO', ''), ' Inc.', '')) || '%'
-			-- Match first few words (for cases like "KSH International" matching "KSH International IPO")
-			OR LOWER(SPLIT_PART(TRIM(i.name), ' ', 1) || ' ' || SPLIT_PART(TRIM(i.name), ' ', 2)) = 
-			   LOWER(SPLIT_PART(TRIM(g.ipo_name), ' ', 1) || ' ' || SPLIT_PART(TRIM(g.ipo_name), ' ', 2))
+			-- Primary relation: direct FK mapping
+			g.ipo_id = i.id
+			-- Backward-compatible fallback for rows not backfilled yet
+			OR (g.ipo_id IS NULL AND i.stock_id IS NOT NULL AND g.stock_id IS NOT NULL AND i.stock_id = g.stock_id)
+			OR (g.ipo_id IS NULL AND i.company_code = g.company_code)
 		)
 		ORDER BY 
 			-- Prioritize stock_id matches
 			CASE 
-				WHEN i.stock_id IS NOT NULL AND g.stock_id IS NOT NULL AND i.stock_id = g.stock_id THEN 1
-				WHEN i.company_code = g.company_code THEN 2
-				ELSE 3
+				WHEN g.ipo_id = i.id THEN 1
+				WHEN i.stock_id IS NOT NULL AND g.stock_id IS NOT NULL AND i.stock_id = g.stock_id THEN 2
+				WHEN i.company_code = g.company_code THEN 3
+				ELSE 4
 			END,
 			CASE 
 				WHEN CURRENT_TIMESTAMP BETWEEN COALESCE(i.open_date, '1900-01-01') AND COALESCE(i.close_date, '2100-01-01') THEN 1
@@ -1096,10 +1056,10 @@ func (s *IPOService) GetActiveIPOsWithGMP(ctx context.Context) ([]models.IPOWith
 			END,
 			g.last_updated DESC,
 			i.created_at DESC
-		LIMIT 100
+		LIMIT $1 OFFSET $2
 	`
 
-	rows, err := s.DB.QueryContext(ctx, query)
+	rows, err := s.DB.QueryContext(ctx, query, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query active IPOs with GMP: %w", err)
 	}
@@ -1167,18 +1127,18 @@ func (s *IPOService) GetIPOByIDWithGMP(ctx context.Context, id string) (*models.
 			g.data_source, g.extraction_metadata
 		FROM ipo_list i
 		LEFT JOIN ipo_gmp g ON (
-			-- Primary: Use stock_id for linking when available
-			(i.stock_id IS NOT NULL AND g.stock_id IS NOT NULL AND i.stock_id = g.stock_id)
-			-- Fallback: company_code match
-			OR i.company_code = g.company_code
+			g.ipo_id = i.id
+			OR (g.ipo_id IS NULL AND i.stock_id IS NOT NULL AND g.stock_id IS NOT NULL AND i.stock_id = g.stock_id)
+			OR (g.ipo_id IS NULL AND i.company_code = g.company_code)
 		)
 		WHERE i.id = $1
 		ORDER BY 
 			-- Prioritize stock_id matches
 			CASE 
-				WHEN i.stock_id IS NOT NULL AND g.stock_id IS NOT NULL AND i.stock_id = g.stock_id THEN 1
-				WHEN i.company_code = g.company_code THEN 2
-				ELSE 3
+				WHEN g.ipo_id = i.id THEN 1
+				WHEN i.stock_id IS NOT NULL AND g.stock_id IS NOT NULL AND i.stock_id = g.stock_id THEN 2
+				WHEN i.company_code = g.company_code THEN 3
+				ELSE 4
 			END,
 			g.last_updated DESC
 		LIMIT 1

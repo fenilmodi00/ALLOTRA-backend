@@ -32,6 +32,7 @@ type EnhancedGMPData struct {
 	LastUpdated      time.Time  `json:"last_updated"`
 
 	// New enhanced fields
+	IPOID              *string             `json:"ipo_id,omitempty"`
 	StockID            *string             `json:"stock_id"`            // Link to IPO table
 	SubscriptionStatus *string             `json:"subscription_status"` // e.g., "10.5x subscribed"
 	ListingGain        *string             `json:"listing_gain"`        // e.g., "+15.2%", "-5.8%"

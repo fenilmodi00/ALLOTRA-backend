@@ -357,7 +357,7 @@ func (j *GMPHistoryUpdateJob) retryFailedIPOs(metrics *JobMetrics) {
 		}).Info("Retrying failed IPO")
 
 		// Attempt to scrape and save
-		collection, err := j.GMPHistoryService.ScrapeIPOPriceHistory(failedIPO.IPOID, failedIPO.CompanyCode)
+		collection, err := j.GMPHistoryService.ScrapeIPOPriceHistoryWithName(failedIPO.IPOID, failedIPO.CompanyCode, failedIPO.IPOName)
 		if err != nil {
 			// Still failing, increment retry count and keep in failed list
 			failedIPO.RetryCount++
