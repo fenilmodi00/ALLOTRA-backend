@@ -1,3 +1,4 @@
+-- +goose Up
 -- Migration: Fix Negative GMP Values
 -- Description: Allows negative GMP values in gmp_price_history table
 -- Date: 2026-02-21
@@ -12,3 +13,7 @@ ALTER TABLE gmp_price_history ADD CONSTRAINT chk_gmp_history_ipo_price_positive 
 
 -- Note: estimated_listing can also be negative if GMP is very negative
 -- We'll allow it but validate in application code
+
+-- +goose Down
+ALTER TABLE gmp_price_history DROP CONSTRAINT IF EXISTS chk_gmp_history_ipo_price_positive;
+ALTER TABLE gmp_price_history ADD CONSTRAINT chk_gmp_history_prices_positive CHECK (ipo_price >= 0 AND gmp_value >= 0 AND estimated_listing >= 0);

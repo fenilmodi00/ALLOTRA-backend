@@ -1,3 +1,4 @@
+-- +goose Up
 -- Migration: Add GMP Price History Tables
 -- Description: Creates tables for storing historical GMP price data and job execution logs
 -- Date: 2024
