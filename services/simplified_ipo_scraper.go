@@ -1471,7 +1471,10 @@ func (service *ChittorgarhIPOScrapingService) createPartialIPOFromListItem(listI
 	}
 
 	if listItem.LogoURL != "" {
-		partialIPO.LogoURL = &listItem.LogoURL
+		logoURL := service.utilityService.NormalizeChittorgarhLogoURL(listItem.LogoURL)
+		if logoURL != "" {
+			partialIPO.LogoURL = &logoURL
+		}
 	}
 
 	return partialIPO
@@ -1553,7 +1556,10 @@ func (service *ChittorgarhIPOScrapingService) buildIPOModelFromExtractedData(
 
 	// Set logo URL from list item
 	if listItem.LogoURL != "" {
-		ipoModel.LogoURL = &listItem.LogoURL
+		logoURL := service.utilityService.NormalizeChittorgarhLogoURL(listItem.LogoURL)
+		if logoURL != "" {
+			ipoModel.LogoURL = &logoURL
+		}
 	}
 
 	return ipoModel
@@ -1663,7 +1669,10 @@ func (service *ChittorgarhIPOScrapingService) buildIPOModelFromExtractedDataWith
 
 	// Set logo URL from list item
 	if listItem.LogoURL != "" {
-		ipoModel.LogoURL = &listItem.LogoURL
+		logoURL := service.utilityService.NormalizeChittorgarhLogoURL(listItem.LogoURL)
+		if logoURL != "" {
+			ipoModel.LogoURL = &logoURL
+		}
 	}
 
 	logger.WithFields(logrus.Fields{
@@ -2163,9 +2172,10 @@ func (service *ChittorgarhIPOScrapingService) convertChittorgarhDataToIPO(data C
 
 	// Set logo URL - prefer the one from API list, fallback to generated
 	if listItem.LogoURL != "" {
-		// Use the logo URL from the API list (most accurate)
-		fullLogoURL := fmt.Sprintf("https://www.chittorgarh.net/images/ipo/%s", listItem.LogoURL)
-		ipo.LogoURL = &fullLogoURL
+		logoURL := service.utilityService.NormalizeChittorgarhLogoURL(listItem.LogoURL)
+		if logoURL != "" {
+			ipo.LogoURL = &logoURL
+		}
 	} else if data.URLRewriteFolderName != "" {
 		// Fallback: generate logo URL using the standard Chittorgarh pattern
 		// Remove -ipo suffix from URLRewriteFolderName for logo URL generation
@@ -2338,10 +2348,11 @@ func (service *ChittorgarhIPOScrapingService) convertChittorgarhDataToIPOWithLog
 
 	// Set logo URL - prefer the one from API list, fallback to generated
 	if listItem.LogoURL != "" {
-		// Use the logo URL from the API list (most accurate)
-		fullLogoURL := fmt.Sprintf("https://www.chittorgarh.net/images/ipo/%s", listItem.LogoURL)
-		ipo.LogoURL = &fullLogoURL
-		logger.WithField("logo_url", fullLogoURL).Debug("Set logo URL from API list")
+		logoURL := service.utilityService.NormalizeChittorgarhLogoURL(listItem.LogoURL)
+		if logoURL != "" {
+			ipo.LogoURL = &logoURL
+			logger.WithField("logo_url", logoURL).Debug("Set logo URL from API list")
+		}
 	} else if data.URLRewriteFolderName != "" {
 		// Fallback: generate logo URL using the standard Chittorgarh pattern
 		// Remove -ipo suffix from URLRewriteFolderName for logo URL generation

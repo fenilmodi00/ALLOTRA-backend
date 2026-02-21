@@ -69,6 +69,42 @@ func (s *UtilityService) NormalizeTextContent(text string) string {
 	return strings.TrimSpace(text)
 }
 
+// NormalizeChittorgarhLogoURL ensures a Chittorgarh logo URL is fully qualified.
+// Accepts raw filenames, relative paths, protocol-relative URLs, and absolute URLs.
+func (s *UtilityService) NormalizeChittorgarhLogoURL(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+
+	lower := strings.ToLower(trimmed)
+	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") {
+		return trimmed
+	}
+	if strings.HasPrefix(trimmed, "//") {
+		return "https:" + trimmed
+	}
+	if strings.HasPrefix(lower, "www.") {
+		return "https://" + trimmed
+	}
+	if strings.Contains(lower, "chittorgarh.net/images/ipo/") {
+		return "https://" + trimmed
+	}
+
+	const baseURL = "https://www.chittorgarh.net/images/ipo/"
+	if strings.HasPrefix(trimmed, "/images/ipo/") {
+		return baseURL + strings.TrimPrefix(trimmed, "/images/ipo/")
+	}
+	if strings.HasPrefix(trimmed, "images/ipo/") {
+		return baseURL + strings.TrimPrefix(trimmed, "images/ipo/")
+	}
+	if strings.HasPrefix(trimmed, "/") {
+		return baseURL + strings.TrimPrefix(trimmed, "/")
+	}
+
+	return baseURL + trimmed
+}
+
 // CleanCompanyText normalizes and cleans extracted text content using enhanced scraper patterns
 func (s *UtilityService) CleanCompanyText(text string) string {
 	if text == "" {
