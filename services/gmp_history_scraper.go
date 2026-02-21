@@ -19,11 +19,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	chromeDPWaitTime = 5 * time.Second
+	sharesPerLot     = 1000
+)
+
 // GMPPriceHistoryScraper handles web scraping of GMP price history from InvestorGain
 type GMPPriceHistoryScraper struct {
 	db                 *sql.DB
 	logger             *logrus.Logger
-	errorLogger        *GMPHistoryErrorLogger
 	httpClient         *shared.HTTPClientFactory
 	requestRateLimiter *shared.HTTPRequestRateLimiter
 	circuitBreaker     *shared.CircuitBreaker
@@ -121,42 +125,18 @@ func (s *GMPPriceHistoryScraper) ScrapeHistoryFromURL(url string) (*ScrapedHisto
 	})
 
 	if circuitErr != nil {
-		// Check if circuit breaker is open
 		if circuitErr == shared.ErrCircuitOpen {
-			if s.errorLogger != nil {
-				s.errorLogger.LogExternalServiceError(
-					"GMPPriceHistoryScraper",
-					"ScrapeHistoryFromURL",
-					circuitErr,
-					map[string]interface{}{
-						"url":             url,
-						"circuit_breaker": "investorgain-scraper",
-						"state":           "open",
-					},
-				)
-			} else {
-				s.logger.WithFields(logrus.Fields{
-					"url":             url,
-					"circuit_breaker": "investorgain-scraper",
-				}).Error("Circuit breaker is open, external service unavailable")
-			}
+			s.logger.WithFields(logrus.Fields{
+				"url":             url,
+				"circuit_breaker": "investorgain-scraper",
+			}).Error("Circuit breaker is open, external service unavailable")
 			return nil, fmt.Errorf("external service unavailable (circuit breaker open): %w", circuitErr)
 		}
 
-		if s.errorLogger != nil {
-			s.errorLogger.LogScrapingError(
-				"GMPPriceHistoryScraper",
-				"ScrapeHistoryFromURL",
-				circuitErr,
-				map[string]interface{}{
-					"url":            url,
-					"retry_attempts": s.retryConfig.MaxAttempts,
-				},
-			)
-		} else {
-			s.logger.WithError(circuitErr).Error("Failed to scrape GMP history after all attempts")
-		}
-		return nil, fmt.Errorf("scraping failed: %w", circuitErr)
+		s.logger.WithFields(logrus.Fields{
+			"url": url,
+		}).Error("Failed to execute scraping: ", circuitErr)
+		return nil, fmt.Errorf("failed to scrape: %w", circuitErr)
 	}
 
 	if nonRetryableErr != nil {
@@ -221,32 +201,17 @@ func (s *GMPPriceHistoryScraper) ScrapeHistoryFromAPI(ipoID string, companyCode 
 
 	if circuitErr != nil {
 		if circuitErr == shared.ErrCircuitOpen {
-			if s.errorLogger != nil {
-				s.errorLogger.LogExternalServiceError(
-					"GMPPriceHistoryScraper",
-					"ScrapeHistoryFromAPI",
-					circuitErr,
-					map[string]interface{}{
-						"ipo_id":          ipoID,
-						"circuit_breaker": "investorgain-scraper",
-						"state":           "open",
-					},
-				)
-			}
+			s.logger.WithFields(logrus.Fields{
+				"ipo_id":          ipoID,
+				"circuit_breaker": "investorgain-scraper",
+			}).Error("Circuit breaker is open, external service unavailable")
 			return nil, fmt.Errorf("external service unavailable (circuit breaker open): %w", circuitErr)
 		}
 
-		if s.errorLogger != nil {
-			s.errorLogger.LogScrapingError(
-				"GMPPriceHistoryScraper",
-				"ScrapeHistoryFromAPI",
-				circuitErr,
-				map[string]interface{}{
-					"ipo_id":         ipoID,
-					"retry_attempts": s.retryConfig.MaxAttempts,
-				},
-			)
-		}
+		s.logger.WithFields(logrus.Fields{
+			"ipo_id":         ipoID,
+			"retry_attempts": s.retryConfig.MaxAttempts,
+		}).Error("API scraping failed")
 		return nil, fmt.Errorf("API scraping failed: %w", circuitErr)
 	}
 
@@ -394,9 +359,9 @@ func (s *GMPPriceHistoryScraper) parseAPIDataPoint(dp IPOGmpDataPoint) (models.G
 		entry.ListingPercent = (entry.GMPValue / entry.IPOPrice) * 100
 	}
 
-	// Calculate estimated profit (assuming 1000 shares)
+	// Calculate estimated profit (assuming sharesPerLot shares)
 	if entry.EstimatedProfit == 0 && entry.GMPValue != 0 {
-		entry.EstimatedProfit = entry.GMPValue * 1000
+		entry.EstimatedProfit = entry.GMPValue * sharesPerLot
 	}
 
 	if entry.IPOPrice <= 0 && entry.EstimatedListing <= 0 {
@@ -436,24 +401,15 @@ func (s *GMPPriceHistoryScraper) performScraping(url string) (*ScrapedHistoryDat
 	err := chromedp.Run(ctx,
 		chromedp.Navigate(url),
 		chromedp.WaitVisible(`body`, chromedp.ByQuery),
-		chromedp.Sleep(5*time.Second), // Wait for dynamic content to load
+		chromedp.Sleep(chromeDPWaitTime),
 		chromedp.OuterHTML(`html`, &htmlContent, chromedp.ByQuery),
 	)
 
 	if err != nil {
-		if s.errorLogger != nil {
-			s.errorLogger.LogNetworkError(
-				"GMPPriceHistoryScraper",
-				"performScraping.ChromeDP",
-				err,
-				map[string]interface{}{
-					"url":     url,
-					"timeout": "45s",
-				},
-			)
-		} else {
-			s.logger.WithError(err).Error("Failed to navigate and extract HTML")
-		}
+		s.logger.WithFields(logrus.Fields{
+			"url":     url,
+			"timeout": "45s",
+		}).WithError(err).Error("Failed to navigate and extract HTML")
 		return nil, fmt.Errorf("chromedp navigation failed: %w", err)
 	}
 
@@ -595,22 +551,10 @@ func (s *GMPPriceHistoryScraper) ExtractHistoryTable(htmlContent string) ([]mode
 		// Parse entry with flexible cell count handling
 		entry, err := s.parseHistoryEntryFlexible(cells, rowIdx)
 		if err != nil {
-			if s.errorLogger != nil {
-				s.errorLogger.LogParsingError(
-					"GMPPriceHistoryScraper",
-					"ExtractHistoryTable.ParseEntry",
-					err,
-					map[string]interface{}{
-						"row_index":   rowIdx,
-						"cells_found": len(cells),
-					},
-				)
-			} else {
-				s.logger.WithFields(logrus.Fields{
-					"row_index": rowIdx,
-					"error":     err.Error(),
-				}).Warn("Failed to parse history entry, skipping")
-			}
+			s.logger.WithFields(logrus.Fields{
+				"row_index":   rowIdx,
+				"cells_found": len(cells),
+			}).Warn("Failed to parse history entry, skipping: ", err.Error())
 			errorCount++
 			continue
 		}
@@ -1787,9 +1731,4 @@ func (s *GMPPriceHistoryScraper) GetCircuitBreakerMetrics() map[string]interface
 func (s *GMPPriceHistoryScraper) ResetCircuitBreaker() {
 	s.circuitBreaker.Reset()
 	s.logger.Info("Circuit breaker manually reset")
-}
-
-// SetErrorLogger sets the error logger for the scraper
-func (s *GMPPriceHistoryScraper) SetErrorLogger(errorLogger *GMPHistoryErrorLogger) {
-	s.errorLogger = errorLogger
 }

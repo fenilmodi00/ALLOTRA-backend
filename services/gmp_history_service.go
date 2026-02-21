@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/fenilmodi00/ipo-backend/models"
@@ -17,7 +18,6 @@ import (
 type GMPHistoryService struct {
 	db                 *sql.DB
 	logger             *logrus.Logger
-	errorLogger        *GMPHistoryErrorLogger
 	scraper            *GMPPriceHistoryScraper
 	utilityService     *UtilityService
 	requestRateLimiter *shared.HTTPRequestRateLimiter
@@ -33,7 +33,6 @@ var (
 // NewGMPHistoryService creates a new GMP history service instance
 func NewGMPHistoryService(db *sql.DB) *GMPHistoryService {
 	logger := logrus.New()
-	errorLogger := NewGMPHistoryErrorLogger(logger)
 
 	var resilienceQueue *DBResilienceQueue
 	if db != nil {
@@ -48,15 +47,10 @@ func NewGMPHistoryService(db *sql.DB) *GMPHistoryService {
 	service := &GMPHistoryService{
 		db:              db,
 		logger:          logger,
-		errorLogger:     errorLogger,
 		scraper:         scraper,
 		utilityService:  NewUtilityService(),
 		resilienceQueue: resilienceQueue,
 		cache:           cache,
-	}
-
-	if service.scraper != nil {
-		service.scraper.SetErrorLogger(errorLogger)
 	}
 
 	return service
@@ -95,14 +89,9 @@ func (s *GMPHistoryService) ResolveIPOIdentifier(identifier string) (string, err
 		if err == sql.ErrNoRows {
 			return "", fmt.Errorf("no IPO found with stock_id: %s", identifier)
 		}
-		s.errorLogger.LogDatabaseError(
-			"GMPHistoryService",
-			"ResolveIPOIdentifier",
-			err,
-			map[string]interface{}{
-				"identifier": identifier,
-			},
-		)
+		s.logger.WithFields(logrus.Fields{
+			"identifier": identifier,
+		}).WithError(err).Error("Database error in ResolveIPOIdentifier")
 		return "", fmt.Errorf("failed to resolve identifier: %w", err)
 	}
 
@@ -157,16 +146,11 @@ func (s *GMPHistoryService) SavePriceHistory(history *models.GMPPriceHistoryColl
 	// This provides automatic retry, queuing on failure, and circuit breaker protection
 	err := s.resilienceQueue.SaveWithResilience(history)
 	if err != nil {
-		s.errorLogger.LogDatabaseError(
-			"GMPHistoryService",
-			"SavePriceHistory",
-			err,
-			map[string]interface{}{
-				"ipo_id":       history.IPOID,
-				"company_code": history.CompanyCode,
-				"entry_count":  len(history.Entries),
-			},
-		)
+		s.logger.WithFields(logrus.Fields{
+			"ipo_id":       history.IPOID,
+			"company_code": history.CompanyCode,
+			"entry_count":  len(history.Entries),
+		}).WithError(err).Error("Database error in SavePriceHistory")
 		return err
 	}
 
@@ -258,16 +242,11 @@ func (s *GMPHistoryService) GetPriceHistoryByIPO(ipoID string, dateRange *models
 	// Execute query
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
-		s.errorLogger.LogDatabaseError(
-			"GMPHistoryService",
-			"GetPriceHistoryByIPO",
-			err,
-			map[string]interface{}{
-				"ipo_id":     ipoID,
-				"date_range": dateRange != nil,
-				"query":      "gmp_price_history",
-			},
-		)
+		s.logger.WithFields(logrus.Fields{
+			"ipo_id":     ipoID,
+			"date_range": dateRange != nil,
+			"query":      "gmp_price_history",
+		}).WithError(err).Error("Database error in GetPriceHistoryByIPO")
 		return nil, fmt.Errorf("failed to query price history: %w", err)
 	}
 	defer rows.Close()
@@ -298,15 +277,10 @@ func (s *GMPHistoryService) GetPriceHistoryByIPO(ipoID string, dateRange *models
 			&ipoName,
 		)
 		if err != nil {
-			s.errorLogger.LogDatabaseError(
-				"GMPHistoryService",
-				"GetPriceHistoryByIPO.ScanRow",
-				err,
-				map[string]interface{}{
-					"ipo_id": ipoID,
-					"row":    "price_history_entry",
-				},
-			)
+			s.logger.WithFields(logrus.Fields{
+				"ipo_id": ipoID,
+				"row":    "price_history_entry",
+			}).WithError(err).Error("Error scanning price history row")
 			continue
 		}
 
@@ -853,11 +827,11 @@ func (s *GMPHistoryService) updateJobLogOnSuccess(jobLogID string, metrics *Proc
 		maxErrors := 10
 		if len(metrics.ErrorDetails) > maxErrors {
 			errorSummary = fmt.Sprintf("%s\n... and %d more errors",
-				joinStrings(metrics.ErrorDetails[:maxErrors], "\n"),
+				strings.Join(metrics.ErrorDetails[:maxErrors], "\n"),
 				len(metrics.ErrorDetails)-maxErrors,
 			)
 		} else {
-			errorSummary = joinStrings(metrics.ErrorDetails, "\n")
+			errorSummary = strings.Join(metrics.ErrorDetails, "\n")
 		}
 	}
 
@@ -909,18 +883,6 @@ func (s *GMPHistoryService) updateJobLogOnError(jobLogID string, metrics *Proces
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to update job log on error")
 	}
-}
-
-// joinStrings joins a slice of strings with a separator
-func joinStrings(strs []string, sep string) string {
-	if len(strs) == 0 {
-		return ""
-	}
-	result := strs[0]
-	for i := 1; i < len(strs); i++ {
-		result += sep + strs[i]
-	}
-	return result
 }
 
 // GetResilienceQueueMetrics returns metrics about the database resilience queue
@@ -1162,21 +1124,6 @@ func (s *GMPHistoryService) GetCacheStats() map[string]interface{} {
 		"size":    s.cache.Size(),
 		"type":    "in-memory",
 	}
-}
-
-// GetErrorLogger returns the error logger instance
-func (s *GMPHistoryService) GetErrorLogger() *GMPHistoryErrorLogger {
-	return s.errorLogger
-}
-
-// GetErrorMetrics returns current error metrics
-func (s *GMPHistoryService) GetErrorMetrics() map[string]interface{} {
-	if s.errorLogger == nil {
-		return map[string]interface{}{
-			"enabled": false,
-		}
-	}
-	return s.errorLogger.GetMetricsSummary()
 }
 
 // GetCircuitBreakerMetrics returns circuit breaker metrics from the scraper

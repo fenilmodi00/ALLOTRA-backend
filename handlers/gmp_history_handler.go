@@ -10,26 +10,18 @@ import (
 	"github.com/fenilmodi00/ipo-backend/services"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 // GMPHistoryHandler handles HTTP requests for GMP price history endpoints
 type GMPHistoryHandler struct {
-	Service     *services.GMPHistoryService
-	errorLogger *services.GMPHistoryErrorLogger
+	Service *services.GMPHistoryService
 }
 
 // NewGMPHistoryHandler creates a new GMP history handler instance
 func NewGMPHistoryHandler(service *services.GMPHistoryService) *GMPHistoryHandler {
-	// Get error logger from service if available
-	var errorLogger *services.GMPHistoryErrorLogger
-	if service != nil {
-		// Access error logger through a getter method
-		errorLogger = service.GetErrorLogger()
-	}
-
 	return &GMPHistoryHandler{
-		Service:     service,
-		errorLogger: errorLogger,
+		Service: service,
 	}
 }
 
@@ -108,17 +100,6 @@ func (h *GMPHistoryHandler) GetIPOPriceHistory(c *fiber.Ctx) error {
 	// Try to resolve identifier to IPO ID (UUID)
 	ipoID, err := h.Service.ResolveIPOIdentifier(identifier)
 	if err != nil {
-		if h.errorLogger != nil {
-			h.errorLogger.LogValidationError(
-				"GMPHistoryHandler",
-				"GetIPOPriceHistory.ResolveIdentifier",
-				err,
-				map[string]interface{}{
-					"identifier": identifier,
-					"endpoint":   "/api/gmp/history/{identifier}",
-				},
-			)
-		}
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"success": false,
 			"error":   "Invalid identifier",
@@ -489,8 +470,8 @@ func (h *GMPHistoryHandler) GetHealthCheck(c *fiber.Ctx) error {
 	// Get cache statistics
 	cacheStats := h.Service.GetCacheStats()
 
-	// Get error metrics
-	errorMetrics := h.Service.GetErrorMetrics()
+	// Error metrics no longer available (error logger removed)
+	errorMetrics := map[string]interface{}{"enabled": false}
 
 	// Determine overall health status
 	status := "healthy"
@@ -576,7 +557,7 @@ func (h *GMPHistoryHandler) GetServiceMetrics(c *fiber.Ctx) error {
 			"metrics": h.Service.GetCacheStats(),
 		},
 		"errors": fiber.Map{
-			"metrics": h.Service.GetErrorMetrics(),
+			"metrics": map[string]interface{}{"enabled": false},
 		},
 	}
 
@@ -610,34 +591,20 @@ func (h *GMPHistoryHandler) BackfillGMPHistory(c *fiber.Ctx) error {
 	go func() {
 		results, err := h.Service.ProcessAllActiveIPOHistory()
 		if err != nil {
-			if h.errorLogger != nil {
-				h.errorLogger.LogExternalServiceError(
-					"GMPHistoryHandler",
-					"BackfillGMPHistory",
-					err,
-					map[string]interface{}{
-						"operation": "backfill",
-						"job_id":    jobID,
-					},
-				)
-			}
+			logrus.WithFields(logrus.Fields{
+				"operation": "backfill",
+				"job_id":    jobID,
+			}).WithError(err).Error("Backfill job failed")
 			return
 		}
 
-		if h.errorLogger != nil {
-			h.errorLogger.LogExternalServiceError(
-				"GMPHistoryHandler",
-				"BackfillGMPHistory.Completed",
-				nil,
-				map[string]interface{}{
-					"operation":       "backfill_complete",
-					"job_id":          jobID,
-					"total_processed": results.TotalProcessed,
-					"success_count":   results.SuccessCount,
-					"failure_count":   results.FailureCount,
-				},
-			)
-		}
+		logrus.WithFields(logrus.Fields{
+			"operation":       "backfill_complete",
+			"job_id":          jobID,
+			"total_processed": results.TotalProcessed,
+			"success_count":   results.SuccessCount,
+			"failure_count":   results.FailureCount,
+		}).Info("Backfill job completed")
 	}()
 
 	return c.JSON(fiber.Map{

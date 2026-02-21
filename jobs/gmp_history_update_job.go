@@ -15,7 +15,7 @@ import (
 type GMPHistoryUpdateJob struct {
 	DB                *sql.DB
 	GMPHistoryService *services.GMPHistoryService
-	errorLogger       *services.GMPHistoryErrorLogger
+	logger            *logrus.Logger
 	ExecutionInterval time.Duration
 	ticker            *time.Ticker
 	stopChan          chan bool
@@ -69,10 +69,12 @@ func NewGMPHistoryUpdateJobWithService(db *sql.DB, service *services.GMPHistoryS
 		service = services.NewGMPHistoryService(db)
 	}
 
+	logger := logrus.New()
+
 	return &GMPHistoryUpdateJob{
 		DB:                db,
 		GMPHistoryService: service,
-		errorLogger:       service.GetErrorLogger(),
+		logger:            logger,
 		ExecutionInterval: 4 * time.Hour, // Requirement 4.1: Run every 4 hours
 		stopChan:          make(chan bool),
 		failedIPOs:        make([]FailedIPO, 0),
@@ -84,10 +86,12 @@ func NewGMPHistoryUpdateJobWithService(db *sql.DB, service *services.GMPHistoryS
 // Useful for testing or custom deployment configurations
 func NewGMPHistoryUpdateJobWithInterval(db *sql.DB, interval time.Duration) *GMPHistoryUpdateJob {
 	service := services.NewGMPHistoryService(db)
+	logger := logrus.New()
+
 	return &GMPHistoryUpdateJob{
 		DB:                db,
 		GMPHistoryService: service,
-		errorLogger:       service.GetErrorLogger(),
+		logger:            logger,
 		ExecutionInterval: interval,
 		stopChan:          make(chan bool),
 		failedIPOs:        make([]FailedIPO, 0),
@@ -207,24 +211,11 @@ func (j *GMPHistoryUpdateJob) Run() {
 
 	// Requirement 4.5: Comprehensive error logging and job status tracking
 	if err != nil {
-		if j.errorLogger != nil {
-			j.errorLogger.LogError(
-				services.ErrorCategorySystem,
-				services.ErrorSeverityCritical,
-				"GMPHistoryUpdateJob",
-				"Run.ProcessAllActiveIPOHistory",
-				err,
-				map[string]interface{}{
-					"duration":   metrics.Duration.String(),
-					"job_name":   "GMP History Update",
-					"queue_size": metrics.QueueSizeBefore,
-				},
-			)
-		}
-		logrus.WithFields(logrus.Fields{
-			"error":    err.Error(),
-			"duration": metrics.Duration.String(),
-			"job_name": "GMP History Update",
+		j.logger.WithFields(logrus.Fields{
+			"error":      err.Error(),
+			"duration":   metrics.Duration.String(),
+			"job_name":   "GMP History Update",
+			"queue_size": metrics.QueueSizeBefore,
 		}).Error("GMP History Update Job failed with critical error")
 
 		// Store metrics even on failure
@@ -369,24 +360,12 @@ func (j *GMPHistoryUpdateJob) retryFailedIPOs(metrics *JobMetrics) {
 			metrics.ErrorSummary = append(metrics.ErrorSummary,
 				fmt.Sprintf("Retry failed for %s: %v", failedIPO.IPOName, err))
 
-			if j.errorLogger != nil {
-				j.errorLogger.LogScrapingError(
-					"GMPHistoryUpdateJob",
-					"retryFailedIPOs.Scrape",
-					err,
-					map[string]interface{}{
-						"ipo_id":       failedIPO.IPOID,
-						"ipo_name":     failedIPO.IPOName,
-						"company_code": failedIPO.CompanyCode,
-						"retry_count":  failedIPO.RetryCount,
-					},
-				)
-			} else {
-				logrus.WithFields(logrus.Fields{
-					"ipo_id": failedIPO.IPOID,
-					"error":  err.Error(),
-				}).Error("Retry failed for IPO")
-			}
+			j.logger.WithFields(logrus.Fields{
+				"ipo_id":       failedIPO.IPOID,
+				"ipo_name":     failedIPO.IPOName,
+				"company_code": failedIPO.CompanyCode,
+				"retry_count":  failedIPO.RetryCount,
+			}).Error("Retry failed for IPO: ", err.Error())
 			continue
 		}
 

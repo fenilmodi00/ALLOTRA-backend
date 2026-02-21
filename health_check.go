@@ -23,8 +23,8 @@ func main() {
 
 	// Test 1: Chittorgarh API
 	fmt.Print("📡 Chittorgarh API: ")
-	chittorgarh := services.NewChittorgarhService()
-	if items, err := chittorgarh.FetchIPOList(); err != nil {
+	chittorgarh := services.NewChittorgarhIPOScrapingService(nil)
+	if items, err := chittorgarh.FetchAvailableIPOList(); err != nil {
 		fmt.Printf("❌ FAILED (%v)\n", err)
 	} else {
 		fmt.Printf("✅ OK (%d IPOs)\n", len(items))
@@ -33,7 +33,7 @@ func main() {
 
 	// Test 2: GMP Service
 	fmt.Print("📈 GMP Service: ")
-	gmp := services.NewGMPService()
+	gmp := services.NewSimpleGMPService(nil)
 	if gmpData, err := gmp.FetchGMPData(); err != nil {
 		fmt.Printf("❌ FAILED (%v)\n", err)
 	} else {

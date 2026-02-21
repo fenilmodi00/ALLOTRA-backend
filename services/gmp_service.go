@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/chromedp/chromedp"
-	"github.com/fenilmodi00/ipo-backend/models"
 	"github.com/fenilmodi00/ipo-backend/shared"
 	"github.com/sirupsen/logrus"
 )
@@ -393,28 +392,4 @@ func (s *EnhancedGMPService) Cleanup() {
 	s.LogMetricsSummary()
 
 	logger.Info("Enhanced GMP service cleanup completed")
-}
-
-// ============================================================================
-// IPO Scraping Functionality (Merged from simplified_ipo_scraper.go)
-// ============================================================================
-
-// FetchAvailableIPOList retrieves the complete list of IPOs from Chittorgarh's internal API
-func (s *EnhancedGMPService) FetchAvailableIPOList() ([]ChittorgarhIPOListItem, error) {
-	return s.ipoScrapingService.FetchAvailableIPOList()
-}
-
-// ScrapeDetailedIPOInformation extracts comprehensive IPO data from a specific IPO detail page
-func (s *EnhancedGMPService) ScrapeDetailedIPOInformation(ipoListItem ChittorgarhIPOListItem) (*models.IPO, error) {
-	return s.ipoScrapingService.ScrapeDetailedIPOInformation(ipoListItem)
-}
-
-// ProcessAllAvailableIPOs scrapes all available IPOs with optimized batch processing and error isolation
-func (s *EnhancedGMPService) ProcessAllAvailableIPOs() ([]*models.IPO, error) {
-	return s.ipoScrapingService.ProcessAllAvailableIPOs()
-}
-
-// ProcessAllAvailableIPOsWithContext scrapes all IPOs with context support for cancellation and timeout
-func (s *EnhancedGMPService) ProcessAllAvailableIPOsWithContext(ctx context.Context) ([]*models.IPO, error) {
-	return s.ipoScrapingService.ProcessAllAvailableIPOsWithContext(ctx)
 }
