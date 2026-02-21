@@ -259,11 +259,6 @@ func registerRoutes(
 	admin.Get("/gmp-history/metrics", adminHandler.GetGMPHistoryJobMetrics)
 
 	// Groww IPO scraper — testing & trigger endpoints
-	admin.Get("/scrape/groww/test", adminHandler.TestGrowwScrapeIPO)
-	admin.Get("/scrape/groww/discover", adminHandler.TestGrowwDiscoverSlugs)
-	admin.Post("/scrape/groww/bulk", adminHandler.TriggerGrowwBulkScrape)
-	admin.Get("/scrape/compare", adminHandler.CompareSingleScrape)
-	admin.Post("/scrape/compare/bulk", adminHandler.CompareBulkScrape)
 
 	perf := api.Group("/performance")
 	perf.Get("/metrics", performanceHandler.GetPerformanceMetrics)

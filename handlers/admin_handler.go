@@ -203,3 +203,12 @@ func (h *AdminHandler) GetGMPHistoryJobMetrics(c *fiber.Ctx) error {
 		},
 	})
 }
+
+// ─────────────────────────────────────────────
+//  Scraper Comparison — test endpoints
+// ─────────────────────────────────────────────
+
+// CompareSingleScrape runs both Chittorgarh and Groww scrapers side-by-side
+// for a single slug and returns their scores.
+//
+// GET /api/v1/admin/scrape/compare?slug=gaudium-ivf-ipo
