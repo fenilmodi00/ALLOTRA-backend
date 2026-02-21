@@ -52,6 +52,11 @@ type IPO struct {
 	Strengths json.RawMessage `json:"strengths" db:"strengths"`
 	Risks     json.RawMessage `json:"risks" db:"risks"`
 
+	// Additional structured data from Groww
+	Financials json.RawMessage `json:"financials" db:"financials"`
+	Categories json.RawMessage `json:"categories" db:"categories"`
+	FAQs       json.RawMessage `json:"faqs" db:"faqs"`
+
 	// Audit fields
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`

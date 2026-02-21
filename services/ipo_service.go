@@ -995,14 +995,16 @@ func (s *IPOService) UpsertIPO(ctx context.Context, item models.IPO) error {
 			open_date, close_date, listing_date, result_date,
 			listing_gain, min_qty, min_amount,
 			logo_url, about, strengths, risks,
-			status, registrar, stock_id, form_url, form_fields, parser_config
+			status, registrar, stock_id, form_url, form_fields, parser_config,
+			financials, categories, faqs
 		) VALUES (
 			$1, $2, $3, $4, 
 			$5, $6, $7, $8,
 			$9, $10, $11, $12,
 			$13, $14, $15,
 			$16, $17, $18, $19,
-			$20, $21, $22, '', '{}', '{}'
+			$20, $21, $22, '', '{}', '{}',
+			$23, $24, $25
 		)
 		ON CONFLICT (stock_id) DO UPDATE SET
 			name = EXCLUDED.name,
@@ -1024,6 +1026,9 @@ func (s *IPOService) UpsertIPO(ctx context.Context, item models.IPO) error {
 			about = EXCLUDED.about,
 			strengths = EXCLUDED.strengths,
 			risks = EXCLUDED.risks,
+			financials = EXCLUDED.financials,
+			categories = EXCLUDED.categories,
+			faqs = EXCLUDED.faqs,
 			status = EXCLUDED.status,
 			registrar = EXCLUDED.registrar,
 			updated_at = CURRENT_TIMESTAMP;
@@ -1035,6 +1040,15 @@ func (s *IPOService) UpsertIPO(ctx context.Context, item models.IPO) error {
 	}
 	if len(item.Risks) == 0 {
 		item.Risks = json.RawMessage("[]")
+	}
+	if len(item.Financials) == 0 {
+		item.Financials = json.RawMessage("[]")
+	}
+	if len(item.Categories) == 0 {
+		item.Categories = json.RawMessage("[]")
+	}
+	if len(item.FAQs) == 0 {
+		item.FAQs = json.RawMessage("[]")
 	}
 
 	// Set default values if not provided
@@ -1055,6 +1069,7 @@ func (s *IPOService) UpsertIPO(ctx context.Context, item models.IPO) error {
 		item.ListingGain, item.MinQty, item.MinAmount,
 		item.LogoURL, item.About, item.Strengths, item.Risks,
 		status, registrar, item.StockID,
+		item.Financials, item.Categories, item.FAQs,
 	)
 
 	// Log audit entry for upsert operation
