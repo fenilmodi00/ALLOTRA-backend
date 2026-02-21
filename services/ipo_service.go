@@ -235,6 +235,7 @@ type IPOService struct {
 	serviceMetrics *shared.ServiceMetrics
 	dbMetrics      *shared.DatabaseMetrics
 	httpMetrics    *shared.HTTPMetrics
+	hasGMPIpoID    *bool
 }
 
 // DatabaseOptimizer provides database optimization features
@@ -710,6 +711,13 @@ func (s *IPOService) GetIPOsWithOptimizedQuery(ctx context.Context, status strin
 		// Recalculate status based on current time
 		s.recalculateStatus(&ipo)
 
+		if ipo.LogoURL != nil {
+			logoURL := s.UtilityService.NormalizeChittorgarhLogoURL(*ipo.LogoURL)
+			if logoURL != "" {
+				ipo.LogoURL = &logoURL
+			}
+		}
+
 		ipos = append(ipos, ipo)
 	}
 
@@ -764,6 +772,13 @@ func (s *IPOService) GetActiveIPOsPaginated(ctx context.Context, limit, offset i
 		// Recalculate status based on current time
 		s.recalculateStatus(&ipo)
 
+		if ipo.LogoURL != nil {
+			logoURL := s.UtilityService.NormalizeChittorgarhLogoURL(*ipo.LogoURL)
+			if logoURL != "" {
+				ipo.LogoURL = &logoURL
+			}
+		}
+
 		ipos = append(ipos, ipo)
 	}
 	return ipos, nil
@@ -801,6 +816,10 @@ func isUndefinedTableError(err error) bool {
 }
 
 func (s *IPOService) hasColumn(ctx context.Context, tableName, columnName string) (bool, error) {
+	if tableName == "ipo_gmp" && columnName == "ipo_id" && s.hasGMPIpoID != nil {
+		return *s.hasGMPIpoID, nil
+	}
+
 	query := `
 		SELECT EXISTS (
 			SELECT 1
@@ -815,6 +834,10 @@ func (s *IPOService) hasColumn(ctx context.Context, tableName, columnName string
 	err := s.DB.QueryRowContext(ctx, query, tableName, columnName).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("check column existence %s.%s: %w", tableName, columnName, err)
+	}
+
+	if tableName == "ipo_gmp" && columnName == "ipo_id" {
+		s.hasGMPIpoID = &exists
 	}
 
 	return exists, nil
@@ -853,6 +876,13 @@ func (s *IPOService) GetIPOByID(ctx context.Context, id string) (*models.IPO, er
 	// Recalculate status based on current time
 	s.recalculateStatus(&ipo)
 
+	if ipo.LogoURL != nil {
+		logoURL := s.UtilityService.NormalizeChittorgarhLogoURL(*ipo.LogoURL)
+		if logoURL != "" {
+			ipo.LogoURL = &logoURL
+		}
+	}
+
 	return &ipo, nil
 }
 
@@ -889,6 +919,13 @@ func (s *IPOService) GetIPOByStockID(ctx context.Context, stockID string) (*mode
 
 	// Recalculate status based on current time
 	s.recalculateStatus(&ipo)
+
+	if ipo.LogoURL != nil {
+		logoURL := s.UtilityService.NormalizeChittorgarhLogoURL(*ipo.LogoURL)
+		if logoURL != "" {
+			ipo.LogoURL = &logoURL
+		}
+	}
 
 	return &ipo, nil
 }
@@ -1047,9 +1084,9 @@ func (s *IPOService) UpsertIPO(ctx context.Context, item models.IPO) error {
 	return err
 }
 
-// GetActiveIPOsWithGMP returns IPOs that have GMP data available.
-// Matching priority: stock_id, then company_code, then exact normalized IPO name.
-// This avoids expensive fuzzy joins that can cause request timeouts.
+// GetActiveIPOsWithGMP returns active IPOs enriched with the best matching GMP row.
+// Matching priority: ipo_id, then stock_id, then company_code.
+// IPO rows are always returned even when GMP data is missing.
 func (s *IPOService) GetActiveIPOsWithGMP(ctx context.Context) ([]models.IPOWithGMP, error) {
 	return s.GetActiveIPOsWithGMPPaginated(ctx, 50, 0)
 }
@@ -1072,6 +1109,10 @@ func (s *IPOService) GetActiveIPOsWithGMPPaginated(ctx context.Context, limit, o
 	hasGMPIpoID, colErr := s.hasColumn(ctx, "ipo_gmp", "ipo_id")
 	if colErr != nil {
 		logrus.WithError(colErr).Warn("Failed to detect ipo_gmp.ipo_id column; using legacy join strategy")
+		if s.hasGMPIpoID == nil {
+			fallback := false
+			s.hasGMPIpoID = &fallback
+		}
 	} else if hasGMPIpoID {
 		joinCondition = `(
 			g.ipo_id = i.id
@@ -1099,16 +1140,26 @@ func (s *IPOService) GetActiveIPOsWithGMPPaginated(ctx context.Context, limit, o
 			g.stock_id, g.subscription_status, g.listing_gain, g.ipo_status,
 			g.data_source, g.extraction_metadata
 		FROM ipo_list i
-		INNER JOIN ipo_gmp g ON %s
+		LEFT JOIN LATERAL (
+			SELECT
+				g.gmp_value, g.gain_percent, g.estimated_listing, g.last_updated,
+				g.stock_id, g.subscription_status, g.listing_gain, g.ipo_status,
+				g.data_source, g.extraction_metadata
+			FROM ipo_gmp g
+			WHERE %s
+			ORDER BY
+				%s,
+				g.last_updated DESC
+			LIMIT 1
+		) g ON TRUE
 		ORDER BY
-			%s,
 			CASE
 				WHEN CURRENT_TIMESTAMP BETWEEN COALESCE(i.open_date, '1900-01-01') AND COALESCE(i.close_date, '2100-01-01') THEN 1
 				WHEN i.open_date IS NOT NULL AND i.open_date > CURRENT_TIMESTAMP THEN 2
 				WHEN i.close_date IS NOT NULL AND i.close_date > CURRENT_TIMESTAMP - INTERVAL '30 days' THEN 3
 				ELSE 4
 			END,
-			g.last_updated DESC,
+			g.last_updated DESC NULLS LAST,
 			i.created_at DESC
 		LIMIT $1 OFFSET $2
 	`, joinCondition, priorityOrder)
@@ -1123,7 +1174,7 @@ func (s *IPOService) GetActiveIPOsWithGMPPaginated(ctx context.Context, limit, o
 	}
 	defer rows.Close()
 
-	var ipos []models.IPOWithGMP
+	ipos := make([]models.IPOWithGMP, 0, limit)
 	for rows.Next() {
 		var ipo models.IPOWithGMP
 		var formFields, formHeaders, parserConfig, strengths, risks []byte
@@ -1160,6 +1211,13 @@ func (s *IPOService) GetActiveIPOsWithGMPPaginated(ctx context.Context, limit, o
 
 		// Recalculate status based on current time
 		s.recalculateStatusWithGMP(&ipo)
+
+		if ipo.LogoURL != nil {
+			logoURL := s.UtilityService.NormalizeChittorgarhLogoURL(*ipo.LogoURL)
+			if logoURL != "" {
+				ipo.LogoURL = &logoURL
+			}
+		}
 
 		ipos = append(ipos, ipo)
 	}
@@ -1241,6 +1299,13 @@ func (s *IPOService) GetIPOByIDWithGMP(ctx context.Context, id string) (*models.
 
 	// Recalculate status based on current time
 	s.recalculateStatusWithGMP(&ipo)
+
+	if ipo.LogoURL != nil {
+		logoURL := s.UtilityService.NormalizeChittorgarhLogoURL(*ipo.LogoURL)
+		if logoURL != "" {
+			ipo.LogoURL = &logoURL
+		}
+	}
 
 	return &ipo, nil
 }

@@ -3,8 +3,11 @@ package services
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"html"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -88,6 +91,7 @@ func (s *GMPPriceHistoryScraper) ScrapeHistoryFromURL(url string) (*ScrapedHisto
 	s.logger.WithField("url", url).Info("Starting GMP history scraping")
 
 	var scrapedData *ScrapedHistoryData
+	var nonRetryableErr error
 
 	// Execute with circuit breaker protection (Requirement 6.4)
 	circuitErr := s.circuitBreaker.Execute(func() error {
@@ -99,13 +103,13 @@ func (s *GMPPriceHistoryScraper) ScrapeHistoryFromURL(url string) (*ScrapedHisto
 			// Perform the actual scraping
 			data, err := s.performScraping(url)
 			if err != nil {
-				// Check if error is retryable
-				if shared.IsRetryableError(err) {
-					s.logger.WithError(err).Warn("Retryable error occurred during scraping")
-					return err
+				if !shared.IsRetryableError(err) {
+					nonRetryableErr = err
+					s.logger.WithError(err).Error("Non-retryable error occurred during scraping")
+					return nil
 				}
-				// Non-retryable error, fail immediately
-				s.logger.WithError(err).Error("Non-retryable error occurred during scraping")
+				// Check if error is retryable
+				s.logger.WithError(err).Warn("Retryable error occurred during scraping")
 				return err
 			}
 
@@ -155,6 +159,10 @@ func (s *GMPPriceHistoryScraper) ScrapeHistoryFromURL(url string) (*ScrapedHisto
 		return nil, fmt.Errorf("scraping failed: %w", circuitErr)
 	}
 
+	if nonRetryableErr != nil {
+		return nil, fmt.Errorf("scraping failed: %w", nonRetryableErr)
+	}
+
 	// Calculate total processing time
 	scrapedData.ProcessingTime = time.Since(startTime)
 
@@ -178,6 +186,7 @@ func (s *GMPPriceHistoryScraper) ScrapeHistoryFromAPI(ipoID string, companyCode 
 	}).Info("Starting GMP history scraping via API")
 
 	var scrapedData *ScrapedHistoryData
+	var nonRetryableErr error
 
 	// Execute with circuit breaker protection
 	circuitErr := s.circuitBreaker.Execute(func() error {
@@ -189,11 +198,17 @@ func (s *GMPPriceHistoryScraper) ScrapeHistoryFromAPI(ipoID string, companyCode 
 			// Perform the actual API scraping
 			data, err := s.performAPIScraping(ipoID, companyCode)
 			if err != nil {
-				if shared.IsRetryableError(err) {
-					s.logger.WithError(err).Warn("Retryable error occurred during API scraping")
-					return err
+				if !shared.IsRetryableError(err) {
+					nonRetryableErr = err
+					if errors.Is(err, ErrNoGMPDataAvailable) {
+						s.logger.WithError(err).Info("No GMP data available from API for IPO")
+					} else {
+						s.logger.WithError(err).Error("Non-retryable error occurred during API scraping")
+					}
+					return nil
 				}
-				s.logger.WithError(err).Error("Non-retryable error occurred during API scraping")
+
+				s.logger.WithError(err).Warn("Retryable error occurred during API scraping")
 				return err
 			}
 
@@ -235,6 +250,10 @@ func (s *GMPPriceHistoryScraper) ScrapeHistoryFromAPI(ipoID string, companyCode 
 		return nil, fmt.Errorf("API scraping failed: %w", circuitErr)
 	}
 
+	if nonRetryableErr != nil {
+		return nil, fmt.Errorf("API scraping failed: %w", nonRetryableErr)
+	}
+
 	// Calculate total processing time
 	scrapedData.ProcessingTime = time.Since(startTime)
 
@@ -254,8 +273,8 @@ func (s *GMPPriceHistoryScraper) performAPIScraping(ipoID, companyCode string) (
 		return nil, fmt.Errorf("API client not initialized")
 	}
 
-	// Fetch GMP data from API
-	dataPoints, err := s.apiClient.GetIPOGMPData(ipoID)
+	// Fetch GMP payload from API
+	payload, err := s.apiClient.GetIPOGMPPayload(ipoID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch GMP data from API: %w", err)
 	}
@@ -263,48 +282,66 @@ func (s *GMPPriceHistoryScraper) performAPIScraping(ipoID, companyCode string) (
 	// Transform API data to ScrapedHistoryData
 	scrapedData := &ScrapedHistoryData{
 		CompanyCode:     companyCode,
+		IPOName:         companyCode,
 		LastUpdated:     time.Now(),
 		ScrapingSuccess: true,
 		ErrorCount:      0,
-		PriceHistory:    make([]models.GMPPriceHistoryEntry, 0, len(dataPoints)),
+		PriceHistory:    make([]models.GMPPriceHistoryEntry, 0, len(payload.DataPoints)),
 	}
 
-	// Get IPO name from database if available
-	if s.db != nil {
-		var ipoName string
-		err := s.db.QueryRow("SELECT name FROM ipo_list WHERE id = $1", ipoID).Scan(&ipoName)
-		if err == nil {
-			scrapedData.IPOName = ipoName
+	// Parse day-wise table first when available (usually has full history)
+	if strings.TrimSpace(payload.TableHTML) != "" {
+		tableEntries, tableErrors := s.ExtractHistoryTable(payload.TableHTML)
+		scrapedData.ErrorCount += tableErrors
+		for _, entry := range tableEntries {
+			entry.CompanyCode = companyCode
+			entry.IPOID = ipoID
+			scrapedData.PriceHistory = append(scrapedData.PriceHistory, entry)
 		}
 	}
 
-	// Parse each data point
-	for _, dp := range dataPoints {
-		entry, err := s.parseAPIDataPoint(dp)
-		if err != nil {
-			s.logger.WithError(err).Warn("Failed to parse API data point, skipping")
-			scrapedData.ErrorCount++
-			continue
+	// Fallback to direct API data points if table parsing produced no entries
+	if len(scrapedData.PriceHistory) == 0 {
+		for _, dp := range payload.DataPoints {
+			entry, err := s.parseAPIDataPoint(dp)
+			if err != nil {
+				s.logger.WithError(err).Warn("Failed to parse API data point, skipping")
+				scrapedData.ErrorCount++
+				continue
+			}
+			entry.CompanyCode = companyCode
+			entry.IPOID = ipoID
+			scrapedData.PriceHistory = append(scrapedData.PriceHistory, entry)
 		}
-		entry.CompanyCode = companyCode
-		entry.IPOID = ipoID
-		scrapedData.PriceHistory = append(scrapedData.PriceHistory, entry)
 	}
 
 	if len(scrapedData.PriceHistory) == 0 {
 		return nil, fmt.Errorf("no valid price history entries found")
 	}
 
+	// Ensure entries are ordered newest-first for downstream consumers
+	sort.Slice(scrapedData.PriceHistory, func(i, j int) bool {
+		return scrapedData.PriceHistory[i].RecordDate.After(scrapedData.PriceHistory[j].RecordDate)
+	})
+
 	// Set current GMP from latest entry
 	if len(scrapedData.PriceHistory) > 0 {
 		scrapedData.CurrentGMP = scrapedData.PriceHistory[0].GMPValue
 		scrapedData.IPOPrice = scrapedData.PriceHistory[0].IPOPrice
-		if scrapedData.IPOName == "" {
-			scrapedData.IPOName = companyCode
-		}
 	}
 
 	return scrapedData, nil
+}
+
+func firstNonEmptyValue(values ...string) string {
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+
+	return ""
 }
 
 // parseAPIDataPoint converts an API data point to a GMPPriceHistoryEntry
@@ -317,28 +354,53 @@ func (s *GMPPriceHistoryScraper) parseAPIDataPoint(dp IPOGmpDataPoint) (models.G
 	}
 
 	// Parse date
-	parsedDate, err := time.Parse("02-01-2006", dp.Date)
+	dateValue := firstNonEmptyValue(dp.Date.String(), dp.LegacyDate.String())
+	if dateValue == "" {
+		return entry, fmt.Errorf("missing date value in API response")
+	}
+
+	parsedDate, err := s.parseDateWithStatus(dateValue)
 	if err != nil {
-		// Try alternative format
-		parsedDate, err = time.Parse("2006-01-02", dp.Date)
+		parsedDate, err = s.parseDate(dateValue)
 		if err != nil {
-			return entry, fmt.Errorf("failed to parse date '%s': %w", dp.Date, err)
+			return entry, fmt.Errorf("failed to parse date '%s': %w", dateValue, err)
 		}
 	}
 	entry.RecordDate = parsedDate
 
 	// Set values from API
-	entry.GMPValue = dp.GMP
-	entry.IPOPrice = dp.IPOPrice
-	entry.EstimatedListing = dp.EstimatedListing
-	entry.ListingPercent = dp.EstimatedPercent
-	entry.Sub2Sauda = dp.Sub2
+	entry.GMPValue = s.parseGMPValue(firstNonEmptyValue(dp.GMP.String(), dp.LegacyGMP.String()))
+	entry.IPOPrice = s.parseFloat(firstNonEmptyValue(dp.IPOPrice.String(), dp.LegacyIPOPrice.String()))
+	entry.EstimatedListing = s.parseEstimatedListingPrice(firstNonEmptyValue(dp.EstimatedListing.String(), dp.LegacyEstimated.String()))
+	entry.ListingPercent = s.parseEstimatedListingPercent(firstNonEmptyValue(dp.EstimatedPercent.String(), dp.LegacyEstimatedPct.String()))
+	entry.Sub2Sauda = s.parseFloat(firstNonEmptyValue(dp.Sub2.String(), dp.LegacySub2.String()))
+	entry.EstimatedProfit = s.parseFloat(firstNonEmptyValue(dp.EstimatedProfit.String(), dp.LegacyEstimatedProfit.String()))
+	entry.LastUpdated = firstNonEmptyValue(dp.LastUpdated.String(), dp.LegacyLastUpdated.String())
 	entry.SubscriptionStatus = "Not Available"
-	entry.LastUpdated = time.Now().Format("02-01-2006 15:04")
+
+	if entry.LastUpdated == "" {
+		entry.LastUpdated = time.Now().Format("02-01-2006 15:04")
+	}
+
+	if entry.EstimatedListing == 0 && entry.IPOPrice > 0 {
+		entry.EstimatedListing = entry.IPOPrice + entry.GMPValue
+	}
+
+	if entry.IPOPrice == 0 && entry.EstimatedListing > 0 {
+		entry.IPOPrice = entry.EstimatedListing - entry.GMPValue
+	}
+
+	if entry.ListingPercent == 0 && entry.IPOPrice > 0 {
+		entry.ListingPercent = (entry.GMPValue / entry.IPOPrice) * 100
+	}
 
 	// Calculate estimated profit (assuming 1000 shares)
-	if entry.GMPValue > 0 {
+	if entry.EstimatedProfit == 0 && entry.GMPValue != 0 {
 		entry.EstimatedProfit = entry.GMPValue * 1000
+	}
+
+	if entry.IPOPrice <= 0 && entry.EstimatedListing <= 0 {
+		return entry, fmt.Errorf("missing price fields in API response")
 	}
 
 	return entry, nil
@@ -427,12 +489,12 @@ func (s *GMPPriceHistoryScraper) ExtractHistoryTable(htmlContent string) ([]mode
 	errorCount := 0
 
 	// Find all tables with GMP history using robust CSS selectors
-	tablePattern := `<table[^>]*class="table table-bordered[^"]*"[^>]*>(.*?)</table>`
-	tableRe := regexp.MustCompile(`(?s)` + tablePattern)
+	tablePattern := `<table[^>]*>(.*?)</table>`
+	tableRe := regexp.MustCompile(`(?is)` + tablePattern)
 	allTableMatches := tableRe.FindAllStringSubmatch(htmlContent, -1)
 
 	if len(allTableMatches) == 0 {
-		s.logger.Warn("No tables with 'table table-bordered' class found in HTML")
+		s.logger.Warn("No table elements found in HTML")
 		return history, 0
 	}
 
@@ -450,20 +512,18 @@ func (s *GMPPriceHistoryScraper) ExtractHistoryTable(htmlContent string) ([]mode
 
 		tableContent := tableMatch[1]
 
-		// Extract tbody content
+		// Extract tbody content (fallback to full table if tbody is absent)
 		tbodyPattern := `<tbody[^>]*>(.*?)</tbody>`
-		tbodyRe := regexp.MustCompile(`(?s)` + tbodyPattern)
+		tbodyRe := regexp.MustCompile(`(?is)` + tbodyPattern)
 		tbodyMatches := tbodyRe.FindStringSubmatch(tableContent)
-
-		if len(tbodyMatches) < 2 {
-			continue
+		tbodyContent := tableContent
+		if len(tbodyMatches) >= 2 {
+			tbodyContent = tbodyMatches[1]
 		}
-
-		tbodyContent := tbodyMatches[1]
 
 		// Extract first row to count cells
 		rowPattern := `<tr[^>]*>(.*?)</tr>`
-		rowRe := regexp.MustCompile(`(?s)` + rowPattern)
+		rowRe := regexp.MustCompile(`(?is)` + rowPattern)
 		rows := rowRe.FindAllStringSubmatch(tbodyContent, -1)
 
 		if len(rows) == 0 {
@@ -472,7 +532,7 @@ func (s *GMPPriceHistoryScraper) ExtractHistoryTable(htmlContent string) ([]mode
 
 		// Count cells in first row
 		cellPattern := `<td[^>]*>(.*?)</td>`
-		cellRe := regexp.MustCompile(`(?s)` + cellPattern)
+		cellRe := regexp.MustCompile(`(?is)` + cellPattern)
 		cells := cellRe.FindAllStringSubmatch(rows[0][1], -1)
 		cellCount := len(cells)
 
@@ -502,7 +562,7 @@ func (s *GMPPriceHistoryScraper) ExtractHistoryTable(htmlContent string) ([]mode
 
 	// Extract rows from the best table
 	rowPattern := `<tr[^>]*>(.*?)</tr>`
-	rowRe := regexp.MustCompile(`(?s)` + rowPattern)
+	rowRe := regexp.MustCompile(`(?is)` + rowPattern)
 	rows := rowRe.FindAllStringSubmatch(bestTable, -1)
 
 	s.logger.WithField("rows_found", len(rows)).Info("Extracting price history rows")
@@ -514,7 +574,7 @@ func (s *GMPPriceHistoryScraper) ExtractHistoryTable(htmlContent string) ([]mode
 
 		// Extract cells from row
 		cellPattern := `<td[^>]*>(.*?)</td>`
-		cellRe := regexp.MustCompile(`(?s)` + cellPattern)
+		cellRe := regexp.MustCompile(`(?is)` + cellPattern)
 		cells := cellRe.FindAllStringSubmatch(row[1], -1)
 
 		// Enhanced: Handle different table structures
@@ -634,11 +694,6 @@ func (s *GMPPriceHistoryScraper) parseEightColumnEntry(cells [][]string) (models
 	entry.LastUpdated = s.cleanText(cells[7][1])
 
 	return entry, nil
-}
-
-// parseFullTableEntry parses the standard 8-column table (kept for backward compatibility)
-func (s *GMPPriceHistoryScraper) parseFullTableEntry(cells [][]string) (models.GMPPriceHistoryEntry, error) {
-	return s.parseEightColumnEntry(cells)
 }
 
 // parseSevenColumnEntry parses 7-column table (KRM Ayurveda structure)
@@ -861,6 +916,22 @@ func (s *GMPPriceHistoryScraper) FindInvestorGainNumericID(companyCode string, i
 		"ipo_name":     ipoName,
 	}).Info("Searching for InvestorGain numeric ID")
 
+	if numericID, err := s.findNumericIDFromAPIURLList(companyCode, ipoName); err == nil {
+		logger.WithFields(logrus.Fields{
+			"company_code": companyCode,
+			"ipo_name":     ipoName,
+			"numeric_id":   numericID,
+			"source":       "api_url_list",
+		}).Info("Found InvestorGain numeric ID")
+		return numericID, nil
+	} else {
+		logger.WithFields(logrus.Fields{
+			"company_code": companyCode,
+			"ipo_name":     ipoName,
+			"error":        err.Error(),
+		}).Debug("API URL list lookup failed, falling back to listing page scraping")
+	}
+
 	// Setup Chrome
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", true),
@@ -903,6 +974,99 @@ func (s *GMPPriceHistoryScraper) FindInvestorGainNumericID(companyCode string, i
 
 	// Extract numeric ID using multiple matching strategies
 	return s.findNumericIDWithMultipleStrategies(htmlContent, companyCode, ipoName)
+}
+
+func (s *GMPPriceHistoryScraper) findNumericIDFromAPIURLList(companyCode, ipoName string) (string, error) {
+	if s.apiClient == nil {
+		return "", fmt.Errorf("api client not initialized")
+	}
+
+	entries, err := s.apiClient.GetIPOUrlList()
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch IPO URL list: %w", err)
+	}
+	if len(entries) == 0 {
+		return "", fmt.Errorf("IPO URL list is empty")
+	}
+
+	type candidate struct {
+		code      string
+		name      string
+		numericID string
+	}
+
+	candidates := make([]candidate, 0, len(entries))
+	for _, entry := range entries {
+		numericID := strings.TrimSpace(entry.NumericID)
+		if numericID == "" {
+			_, parsedNumericID := parseInvestorGainGMPURL(entry.URL)
+			numericID = parsedNumericID
+		}
+
+		code := normalizeCompanyCode(entry.CompanyCode)
+		if code == "" {
+			code = normalizeCompanyCode(entry.URLCode)
+		}
+		if code == "" {
+			parsedCode, _ := parseInvestorGainGMPURL(entry.URL)
+			code = parsedCode
+		}
+
+		if code == "" || numericID == "" {
+			continue
+		}
+
+		name := strings.TrimSpace(entry.CompanyName)
+		if name == "" {
+			name = code
+		}
+
+		candidates = append(candidates, candidate{
+			code:      code,
+			name:      name,
+			numericID: numericID,
+		})
+	}
+
+	if len(candidates) == 0 {
+		return "", fmt.Errorf("IPO URL list has no parseable entries")
+	}
+
+	normalizedCode := normalizeCompanyCode(companyCode)
+	normalizedName := s.normalizeIPOName(ipoName)
+	nameWords := strings.Fields(normalizedName)
+
+	for _, item := range candidates {
+		if item.code == normalizedCode {
+			return item.numericID, nil
+		}
+	}
+
+	variations := s.generateCompanyCodeVariations(normalizedCode)
+	for _, variation := range variations {
+		normalizedVariation := normalizeCompanyCode(variation)
+		for _, item := range candidates {
+			if item.code == normalizedVariation || strings.Contains(item.code, normalizedVariation) || strings.Contains(normalizedVariation, item.code) {
+				return item.numericID, nil
+			}
+		}
+	}
+
+	bestScore := 0.0
+	bestNumericID := ""
+	for _, item := range candidates {
+		score := s.calculateNameSimilarity(normalizedName, s.normalizeIPOName(item.name), nameWords)
+		if score > bestScore && score > 0.5 {
+			bestScore = score
+			bestNumericID = item.numericID
+		}
+	}
+
+	if bestNumericID != "" {
+		return bestNumericID, nil
+	}
+
+	return "", fmt.Errorf("no matching IPO found in InvestorGain API URL list for %s (%s)", ipoName, companyCode)
 }
 
 // findNumericIDWithMultipleStrategies tries multiple matching approaches
@@ -970,12 +1134,6 @@ func (s *GMPPriceHistoryScraper) findByExactCompanyCode(htmlContent, companyCode
 		}
 		urlCode := match[1]
 		numericID := match[2]
-
-		s.logger.WithFields(logrus.Fields{
-			"url_code":   urlCode,
-			"numeric_id": numericID,
-			"comparing":  fmt.Sprintf("'%s' == '%s'", urlCode, normalizedCode),
-		}).Debug("Checking URL code")
 
 		if urlCode == normalizedCode {
 			s.logger.WithFields(logrus.Fields{
@@ -1139,7 +1297,7 @@ func (s *GMPPriceHistoryScraper) generateCompanyCodeVariations(code string) []st
 	variations = append(variations, strings.ReplaceAll(code, "_", "-"))
 
 	// Add variations without common suffixes
-	suffixes := []string{"-india", "-ltd", "-limited", "-pvt", "-technologies", "-tech", "-systems"}
+	suffixes := []string{"-ipo-details", "-details", "-ipo", "-india", "-ltd", "-limited", "-pvt", "-technologies", "-tech", "-systems"}
 	for _, suffix := range suffixes {
 		if strings.HasSuffix(code, suffix) {
 			variations = append(variations, strings.TrimSuffix(code, suffix))
@@ -1269,7 +1427,9 @@ func (s *GMPPriceHistoryScraper) ValidateScrapedData(data *ScrapedHistoryData) e
 	}
 
 	if data.IPOPrice <= 0 {
-		return fmt.Errorf("IPO price must be positive")
+		logger.WithFields(logrus.Fields{
+			"ipo_name": data.IPOName,
+		}).Debug("IPO price missing in source data; continuing with partial history records")
 	}
 
 	if len(data.PriceHistory) == 0 {
@@ -1278,8 +1438,9 @@ func (s *GMPPriceHistoryScraper) ValidateScrapedData(data *ScrapedHistoryData) e
 
 	// Validate each entry and fail fast on invalid data
 	validEntries := 0
-	for idx, entry := range data.PriceHistory {
-		if err := s.validateHistoryEntryLenient(&entry); err != nil {
+	for idx := range data.PriceHistory {
+		entry := &data.PriceHistory[idx]
+		if err := s.validateHistoryEntryLenient(entry); err != nil {
 			logger.WithFields(logrus.Fields{
 				"entry_index": idx,
 				"error":       err.Error(),
@@ -1447,6 +1608,8 @@ func (s *GMPPriceHistoryScraper) extractCurrentGMP(html string) float64 {
 }
 
 func (s *GMPPriceHistoryScraper) cleanText(text string) string {
+	text = html.UnescapeString(text)
+
 	// Remove HTML tags
 	re := regexp.MustCompile(`<[^>]*>`)
 	text = re.ReplaceAllString(text, "")
@@ -1464,7 +1627,16 @@ func (s *GMPPriceHistoryScraper) parseFloat(text string) float64 {
 	text = strings.ReplaceAll(text, "₹", "")
 	text = strings.ReplaceAll(text, ",", "")
 	text = strings.ReplaceAll(text, "%", "")
+	text = strings.ReplaceAll(text, "+", "")
 	text = strings.TrimSpace(text)
+
+	if text == "" || text == "--" || text == "-" || strings.EqualFold(text, "na") || strings.EqualFold(text, "n/a") {
+		return 0
+	}
+
+	if numericMatch := regexp.MustCompile(`[-+]?\d*\.?\d+`).FindString(text); numericMatch != "" {
+		text = numericMatch
+	}
 
 	val, err := strconv.ParseFloat(text, 64)
 	if err != nil {
@@ -1474,13 +1646,22 @@ func (s *GMPPriceHistoryScraper) parseFloat(text string) float64 {
 }
 
 func (s *GMPPriceHistoryScraper) parseGMPValue(cellContent string) float64 {
-	// Extract GMP value which may contain HTML like "₹4 <img...>"
-	re := regexp.MustCompile(`₹(\d+\.?\d*)`)
-	matches := re.FindStringSubmatch(cellContent)
-	if len(matches) > 1 {
-		val, _ := strconv.ParseFloat(matches[1], 64)
-		return val
+	cleaned := s.cleanText(cellContent)
+	cleaned = strings.ReplaceAll(cleaned, "₹", "")
+	cleaned = strings.ReplaceAll(cleaned, ",", "")
+	cleaned = strings.TrimSpace(cleaned)
+
+	if cleaned == "" || cleaned == "--" || cleaned == "-" || strings.EqualFold(cleaned, "na") || strings.EqualFold(cleaned, "n/a") {
+		return 0
 	}
+
+	if numericMatch := regexp.MustCompile(`[-+]?\d*\.?\d+`).FindString(cleaned); numericMatch != "" {
+		val, err := strconv.ParseFloat(numericMatch, 64)
+		if err == nil {
+			return val
+		}
+	}
+
 	return 0
 }
 
@@ -1492,7 +1673,8 @@ func (s *GMPPriceHistoryScraper) parseEstimatedListingPrice(cellContent string) 
 		val, _ := strconv.ParseFloat(matches[1], 64)
 		return val
 	}
-	return 0
+
+	return s.parseFloat(cellContent)
 }
 
 func (s *GMPPriceHistoryScraper) parseEstimatedListingPercent(cellContent string) float64 {

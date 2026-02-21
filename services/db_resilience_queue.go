@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -24,17 +25,22 @@ type QueuedHistoryData struct {
 // DBResilienceQueue manages temporary queuing of data during database failures
 // Implements Requirement 6.5 - Queue scraped data temporarily during database failures
 type DBResilienceQueue struct {
-	queue          []*QueuedHistoryData
-	mutex          sync.RWMutex
-	maxQueueSize   int
-	maxRetries     int
-	retryInterval  time.Duration
-	logger         *logrus.Logger
-	db             *sql.DB
-	retryConfig    shared.RetryConfig
-	circuitBreaker *shared.CircuitBreaker
-	stopChan       chan struct{}
-	wg             sync.WaitGroup
+	queue           []*QueuedHistoryData
+	mutex           sync.RWMutex
+	maxQueueSize    int
+	maxRetries      int
+	retryInterval   time.Duration
+	logger          *logrus.Logger
+	db              *sql.DB
+	retryConfig     shared.RetryConfig
+	circuitBreaker  *shared.CircuitBreaker
+	stopChan        chan struct{}
+	wg              sync.WaitGroup
+	saveWithRetryFn func(collection *models.GMPPriceHistoryCollection) error
+}
+
+func roundToTwoDecimals(value float64) float64 {
+	return math.Round(value*100) / 100
 }
 
 // NewDBResilienceQueue creates a new database resilience queue
@@ -70,6 +76,8 @@ func NewDBResilienceQueue(db *sql.DB, logger *logrus.Logger) *DBResilienceQueue 
 		circuitBreaker: shared.NewCircuitBreaker("db-resilience", cbConfig),
 		stopChan:       make(chan struct{}),
 	}
+
+	queue.saveWithRetryFn = queue.saveWithRetry
 
 	return queue
 }
@@ -196,9 +204,10 @@ func (q *DBResilienceQueue) processQueue() {
 		return
 	}
 
-	// Get a copy of the queue to process
+	// Get a copy of the queue to process and clear the shared queue.
 	queueCopy := make([]*QueuedHistoryData, len(q.queue))
 	copy(queueCopy, q.queue)
+	q.queue = nil
 	q.mutex.Unlock()
 
 	q.logger.WithField("queue_size", len(queueCopy)).Info("Processing queued data")
@@ -222,7 +231,12 @@ func (q *DBResilienceQueue) processQueue() {
 		}
 
 		// Attempt to save with retry logic
-		err := q.saveWithRetry(item.Collection)
+		err := error(nil)
+		if q.saveWithRetryFn != nil {
+			err = q.saveWithRetryFn(item.Collection)
+		} else {
+			err = q.saveWithRetry(item.Collection)
+		}
 		item.Attempts++
 
 		if err != nil {
@@ -245,9 +259,11 @@ func (q *DBResilienceQueue) processQueue() {
 		}
 	}
 
-	// Update queue with remaining items
+	// Merge any newly enqueued items that arrived while processing.
 	q.mutex.Lock()
-	q.queue = remainingQueue
+	if len(remainingQueue) > 0 {
+		q.queue = append(remainingQueue, q.queue...)
+	}
 	q.mutex.Unlock()
 
 	q.logger.WithFields(logrus.Fields{
@@ -340,6 +356,18 @@ func (q *DBResilienceQueue) saveToDatabase(collection *models.GMPPriceHistoryCol
 			entry.CreatedAt = now
 		}
 		entry.UpdatedAt = now
+
+		// Normalize derived values before persistence so DB constraints remain valid.
+		entry.IPOPrice = roundToTwoDecimals(entry.IPOPrice)
+		entry.GMPValue = roundToTwoDecimals(entry.GMPValue)
+		entry.EstimatedListing = roundToTwoDecimals(entry.IPOPrice + entry.GMPValue)
+		if entry.IPOPrice > 0 {
+			entry.ListingPercent = roundToTwoDecimals((entry.GMPValue / entry.IPOPrice) * 100)
+		} else {
+			entry.ListingPercent = 0
+		}
+		entry.EstimatedProfit = roundToTwoDecimals(entry.EstimatedProfit)
+		entry.Sub2Sauda = roundToTwoDecimals(entry.Sub2Sauda)
 
 		// Set IPO ID and company code from collection
 		entry.IPOID = collection.IPOID

@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS gmp_price_history (
     
     -- Check constraints for data validation
     CONSTRAINT chk_gmp_history_prices_positive CHECK (
-        ipo_price >= 0 AND gmp_value >= 0 AND estimated_listing >= 0
+        ipo_price >= 0 AND estimated_listing >= 0
     ),
     CONSTRAINT chk_gmp_history_listing_calculation CHECK (
         ABS(estimated_listing - (ipo_price + gmp_value)) < 0.01
@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS gmp_price_history (
 );
 
 -- Add constraints for GMP price history table
+-- +goose StatementBegin
 DO $$ 
 BEGIN
     IF NOT EXISTS (
@@ -54,6 +55,7 @@ BEGIN
         ALTER TABLE gmp_price_history ADD CONSTRAINT gmp_price_history_data_source_not_empty CHECK (data_source != '');
     END IF;
 END $$;
+-- +goose StatementEnd
 
 -- Performance indexes for GMP price history
 CREATE INDEX IF NOT EXISTS idx_gmp_history_ipo_id ON gmp_price_history(ipo_id);
@@ -77,6 +79,7 @@ CREATE TABLE IF NOT EXISTS gmp_history_job_log (
 );
 
 -- Add constraints for job log table
+-- +goose StatementBegin
 DO $$ 
 BEGIN
     IF NOT EXISTS (
@@ -114,6 +117,7 @@ BEGIN
         ALTER TABLE gmp_history_job_log ADD CONSTRAINT gmp_history_job_log_total_records_non_negative CHECK (total_records_added >= 0);
     END IF;
 END $$;
+-- +goose StatementEnd
 
 -- Indexes for job log table
 CREATE INDEX IF NOT EXISTS idx_gmp_history_job_log_job_start_time ON gmp_history_job_log(job_start_time DESC);
@@ -121,6 +125,7 @@ CREATE INDEX IF NOT EXISTS idx_gmp_history_job_log_execution_status ON gmp_histo
 CREATE INDEX IF NOT EXISTS idx_gmp_history_job_log_created_at ON gmp_history_job_log(created_at DESC);
 
 -- Create function to automatically update updated_at timestamp
+-- +goose StatementBegin
 CREATE OR REPLACE FUNCTION update_gmp_history_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -128,6 +133,7 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+-- +goose StatementEnd
 
 -- Create trigger for automatic timestamp updates
 DROP TRIGGER IF EXISTS trigger_update_gmp_history_updated_at ON gmp_price_history;

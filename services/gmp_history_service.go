@@ -455,23 +455,82 @@ func (s *GMPHistoryService) ScrapeIPOPriceHistoryWithNameAndStockID(ipoID string
 		"company_code": companyCode,
 	}).Info("Scraping IPO price history via API")
 
+	// Resolve InvestorGain numeric ID first. This is the most reliable identifier
+	// for both API and URL scraping flows.
+	investorGainID := ""
+	if resolvedID, idErr := s.scraper.FindInvestorGainNumericID(companyCode, ipoName); idErr == nil {
+		investorGainID = resolvedID
+	} else {
+		s.logger.WithFields(logrus.Fields{
+			"ipo_id":       ipoID,
+			"company_code": companyCode,
+			"ipo_name":     ipoName,
+			"error":        idErr.Error(),
+		}).Warn("Failed to resolve InvestorGain numeric ID; falling back to local identifiers")
+	}
+
 	// Scrape data from InvestorGain using API (more reliable than HTML scraping)
-	// Use stock_id if available, otherwise fall back to UUID
-	apiID := stockID
+	apiID := investorGainID
+	apiIDSource := "investorgain_numeric_id"
+	if apiID == "" && stockID != "" {
+		apiID = stockID
+		apiIDSource = "stock_id"
+	}
 	if apiID == "" {
 		apiID = ipoID
+		apiIDSource = "ipo_uuid"
 	}
+
+	s.logger.WithFields(logrus.Fields{
+		"ipo_id":            ipoID,
+		"company_code":      companyCode,
+		"api_identifier":    apiID,
+		"identifier_source": apiIDSource,
+	}).Info("Using identifier for InvestorGain API scraping")
+
 	scrapedData, err := s.scraper.ScrapeHistoryFromAPI(apiID, companyCode)
 	if err != nil {
 		s.logger.WithError(err).Warn("API scraping failed, falling back to URL scraping")
 		// Fallback to URL scraping if API fails
-		url, urlErr := s.scraper.BuildIPOHistoryURL(companyCode, ipoName)
+		urlLookupInput := ipoName
+		if investorGainID != "" {
+			urlLookupInput = investorGainID
+		}
+
+		url, urlErr := s.scraper.BuildIPOHistoryURL(companyCode, urlLookupInput)
 		if urlErr != nil {
 			return nil, fmt.Errorf("failed to build URL: %w", urlErr)
 		}
 		scrapedData, err = s.scraper.ScrapeHistoryFromURL(url)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scrape history: %w", err)
+		}
+	}
+
+	// Some InvestorGain tables omit IPO price for older/archived records.
+	// Backfill missing IPO price from local IPO metadata so validation and
+	// persistence remain consistent.
+	var fallbackPrice float64
+	if priceErr := s.db.QueryRow("SELECT COALESCE(price_band_high, price_band_low, 0) FROM ipo_list WHERE id = $1", ipoID).Scan(&fallbackPrice); priceErr != nil {
+		s.logger.WithError(priceErr).WithField("ipo_id", ipoID).Debug("Failed to load fallback IPO price")
+	}
+
+	if fallbackPrice > 0 {
+		if scrapedData.IPOPrice <= 0 {
+			scrapedData.IPOPrice = fallbackPrice
+		}
+
+		for i := range scrapedData.PriceHistory {
+			entry := &scrapedData.PriceHistory[i]
+			if entry.IPOPrice <= 0 {
+				entry.IPOPrice = fallbackPrice
+			}
+			if entry.EstimatedListing <= 0 {
+				entry.EstimatedListing = entry.IPOPrice + entry.GMPValue
+			}
+			if entry.IPOPrice > 0 {
+				entry.ListingPercent = ((entry.EstimatedListing - entry.IPOPrice) / entry.IPOPrice) * 100
+			}
 		}
 	}
 
@@ -542,8 +601,8 @@ type ProcessingMetrics struct {
 	ErrorDetails      []string
 }
 
-// ProcessAllActiveIPOHistory scrapes and saves price history for all active IPOs
-// Implements Requirement 4.2 - Prioritize active IPOs
+// ProcessAllActiveIPOHistory scrapes and saves price history for IPOs currently tracked in ipo_list
+// Implements Requirement 4.2 - Prioritize active IPOs while still covering all listed records
 // Implements Requirement 4.3 - Error isolation
 // Implements Requirement 4.4 - Metrics tracking
 // Returns ProcessingResults containing both successful and failed IPO processing attempts
@@ -577,33 +636,32 @@ func (s *GMPHistoryService) ProcessAllActiveIPOHistory() (*models.ProcessingResu
 		FailedIPOs:     make([]models.IPOProcessingResult, 0),
 	}
 
-	// Query active and recently closed IPOs with priority-based ordering (Requirement 4.2)
+	// Query all tracked IPOs with priority-based ordering (active first)
 	query := `
 		SELECT id, company_code, name, status, close_date, stock_id
 		FROM ipo_list
-		WHERE status IN ($2, $3, $4, $5, $6)
-		  AND (close_date IS NULL OR close_date >= $1)
+		WHERE company_code IS NOT NULL AND company_code <> ''
 		ORDER BY 
 			CASE 
-				WHEN status = $2 THEN 1
-				WHEN status = $3 THEN 2
-				WHEN status = $4 THEN 3
-				WHEN status = $5 THEN 4
-				WHEN status = $6 THEN 5
-				ELSE 6
+				WHEN status = 'ACTIVE' THEN 1
+				WHEN status = $1 THEN 2
+				WHEN status = $2 THEN 3
+				WHEN status = $3 THEN 4
+				WHEN status = $4 THEN 5
+				WHEN status = $5 THEN 6
+				ELSE 7
 			END,
-			close_date DESC NULLS FIRST
-		LIMIT 100
+			COALESCE(close_date, CURRENT_DATE) DESC,
+			updated_at DESC
+		LIMIT 200
 	`
 
-	// Get IPOs from last 3 months
-	threeMonthsAgo := time.Now().AddDate(0, -3, 0)
-	rows, err := s.db.Query(query, threeMonthsAgo, models.StatusLive, models.StatusUpcoming, models.StatusClosed, models.StatusResultOut, models.StatusListed)
+	rows, err := s.db.Query(query, models.StatusLive, models.StatusUpcoming, models.StatusClosed, models.StatusResultOut, models.StatusListed)
 	if err != nil {
 		metrics.EndTime = time.Now()
 		metrics.ProcessingTime = metrics.EndTime.Sub(metrics.StartTime)
-		s.updateJobLogOnError(jobLogID, metrics, fmt.Sprintf("Failed to query active IPOs: %v", err))
-		return nil, fmt.Errorf("failed to query active IPOs: %w", err)
+		s.updateJobLogOnError(jobLogID, metrics, fmt.Sprintf("Failed to query IPOs: %v", err))
+		return nil, fmt.Errorf("failed to query IPOs: %w", err)
 	}
 	defer rows.Close()
 

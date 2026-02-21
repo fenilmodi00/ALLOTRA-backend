@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -372,5 +373,63 @@ func TestRetryConfigDefaults(t *testing.T) {
 
 	if !queue.retryConfig.Jitter {
 		t.Error("Expected Jitter to be enabled")
+	}
+}
+
+func TestProcessQueuePreservesNewEnqueue(t *testing.T) {
+	var db *sql.DB
+	logger := logrus.New()
+	queue := NewDBResilienceQueue(db, logger)
+
+	first := &models.GMPPriceHistoryCollection{
+		IPOID:       "test-ipo-1",
+		CompanyCode: "TEST",
+		Entries: []models.GMPPriceHistoryEntry{
+			{
+				ID:         "entry-1",
+				RecordDate: time.Now(),
+				GMPValue:   100,
+			},
+		},
+	}
+
+	if err := queue.Enqueue(first); err != nil {
+		t.Fatalf("enqueue failed: %v", err)
+	}
+
+	second := &models.GMPPriceHistoryCollection{
+		IPOID:       "test-ipo-2",
+		CompanyCode: "TEST",
+		Entries: []models.GMPPriceHistoryEntry{
+			{
+				ID:         "entry-2",
+				RecordDate: time.Now(),
+				GMPValue:   200,
+			},
+		},
+	}
+
+	ready := make(chan struct{})
+
+	queue.saveWithRetryFn = func(collection *models.GMPPriceHistoryCollection) error {
+		if collection != nil && collection.IPOID == first.IPOID {
+			close(ready)
+			if err := queue.Enqueue(second); err != nil {
+				return err
+			}
+		}
+		return fmt.Errorf("simulated failure")
+	}
+
+	queue.processQueue()
+
+	select {
+	case <-ready:
+	default:
+		t.Fatal("expected saveWithRetry to be called for first item")
+	}
+
+	if queue.GetQueueSize() != 2 {
+		t.Fatalf("expected queue size 2 after processing, got %d", queue.GetQueueSize())
 	}
 }
