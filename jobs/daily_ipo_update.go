@@ -11,24 +11,48 @@ import (
 
 type DailyIPOUpdateJob struct {
 	ScrapingService *services.ChittorgarhIPOScrapingService
+	GrowwScraper    *services.GrowwScraperService
+	GrowwMapper     *services.GrowwMapper
 	IPOService      *services.IPOService
 	UtilityService  *services.UtilityService
 }
 
-func NewDailyIPOUpdateJob(scrapingService *services.ChittorgarhIPOScrapingService, ipoService *services.IPOService, utilityService *services.UtilityService) *DailyIPOUpdateJob {
+func NewDailyIPOUpdateJob(
+	scrapingService *services.ChittorgarhIPOScrapingService,
+	growwScraper *services.GrowwScraperService,
+	growwMapper *services.GrowwMapper,
+	ipoService *services.IPOService,
+	utilityService *services.UtilityService,
+) *DailyIPOUpdateJob {
 	return &DailyIPOUpdateJob{
 		ScrapingService: scrapingService,
+		GrowwScraper:    growwScraper,
+		GrowwMapper:     growwMapper,
 		IPOService:      ipoService,
 		UtilityService:  utilityService,
 	}
 }
 
 func (j *DailyIPOUpdateJob) Run() {
-	logrus.Info("Starting Simplified Daily IPO Update Job")
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	logrus.Info("Starting Daily IPO Update Job with Groww primary + Chittorgarh fallback")
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
 
-	logrus.Info("Fetching IPO list from simplified scraping service...")
+	// 1. Discover all active slugs on Groww
+	logrus.Info("Discovering all available IPO slugs from Groww...")
+	growwSlugs, err := j.GrowwScraper.DiscoverSlugs(ctx)
+	if err != nil {
+		logrus.Errorf("Failed to discover Groww slugs: %v", err)
+	}
+	
+	pendingSlugs := make(map[string]bool)
+	for _, slug := range growwSlugs {
+		pendingSlugs[slug] = true
+	}
+	logrus.Infof("Discovered %d slugs from Groww", len(pendingSlugs))
+
+	// 2. Fetch primary discovery list from Chittorgarh (for absolute maximum coverage)
+	logrus.Info("Fetching IPO list from Chittorgarh scraping service...")
 	items, err := j.ScrapingService.FetchAvailableIPOList()
 	if err != nil {
 		logrus.Errorf("Failed to run Daily IPO Update Job: failed to fetch IPO list: %v", err)
@@ -40,33 +64,54 @@ func (j *DailyIPOUpdateJob) Run() {
 	successCount := 0
 	failureCount := 0
 	partialSuccessCount := 0
+	growwWins := 0
+	chittWins := 0
 
 	for i, item := range items {
+		slug := item.URLRewriteFolderName
+		delete(pendingSlugs, slug) // Mark as processed from Chittorgarh list
+		
 		logrus.WithFields(logrus.Fields{
 			"ipo_index":  i + 1,
 			"total_ipos": len(items),
 			"ipo_name":   item.IPONewsTitle,
+			"slug":       slug,
 		}).Infof("Processing IPO %d/%d: %s", i+1, len(items), item.IPONewsTitle)
 
-		// Scrape detailed IPO data using simplified scraper
-		ipoModel, err := j.ScrapingService.ScrapeDetailedIPOInformation(item)
-		if err != nil {
-			logrus.Errorf("Failed to scrape details for %s: %v", item.IPONewsTitle, err)
-			failureCount++
-			continue
+		var ipoModel *models.IPO
+
+		// 3. Primary Source: Try Groww Details API
+		growwData := j.GrowwScraper.ScrapeIPO(ctx, slug)
+		if growwData.DetailsError == "" && growwData.Details != nil {
+			// Groww succeeded! Map its rich data.
+			ipoModel = j.GrowwMapper.MapToIPO(growwData, &item)
+			growwWins++
+			logrus.WithField("slug", slug).Info("Scraped rich data from Groww successfully")
+		} else {
+			// 4. Fallback Source: Chittorgarh Basic JSON Metadata
+			logrus.WithFields(logrus.Fields{
+				"slug":  slug,
+				"error": growwData.DetailsError,
+			}).Warn("Groww failed or 404ed, falling back to Chittorgarh")
+			
+			ipoModel, err = j.ScrapingService.ScrapeDetailedIPOInformation(item)
+			if err != nil {
+				logrus.Errorf("Failed to scrape details for %s from fallback: %v", item.IPONewsTitle, err)
+				failureCount++
+				continue
+			}
+			chittWins++
 		}
 
-		// Generate company_code using utility service
-		ipoModel.CompanyCode = j.UtilityService.GenerateCompanyCode(ipoModel.Name)
-		logrus.Debugf("Generated company_code for %s: %s", ipoModel.Name, ipoModel.CompanyCode)
+		// Ensure company code exists
+		if ipoModel.CompanyCode == "" {
+			ipoModel.CompanyCode = j.UtilityService.GenerateCompanyCode(ipoModel.Name)
+		}
 
 		// Analyze data completeness
 		completeness := j.analyzeDataCompleteness(ipoModel)
 
-		// Log field population status
-		j.logFieldPopulation(ipoModel, completeness)
-
-		// Persist to ipos table with comprehensive error handling
+		// Persist to ipos table
 		if err := j.IPOService.UpsertIPO(ctx, *ipoModel); err != nil {
 			logrus.Errorf("Failed to upsert IPO %s to ipos table: %v", item.IPONewsTitle, err)
 			failureCount++
@@ -77,26 +122,37 @@ func (j *DailyIPOUpdateJob) Run() {
 		if completeness.CriticalFieldsComplete {
 			if completeness.OverallCompleteness >= 80.0 {
 				successCount++
-				logrus.Infof("Successfully saved IPO %s with %.1f%% data completeness",
-					ipoModel.Name, completeness.OverallCompleteness)
 			} else {
 				partialSuccessCount++
-				logrus.Warnf("Partially saved IPO %s with %.1f%% data completeness (missing optional fields)",
-					ipoModel.Name, completeness.OverallCompleteness)
 			}
 		} else {
 			partialSuccessCount++
-			logrus.Warnf("Saved IPO %s with incomplete critical data (%.1f%% completeness)",
-				ipoModel.Name, completeness.OverallCompleteness)
 		}
 
-		// Be nice to the server with progressive delays
-		if i < len(items)-1 { // Don't sleep after the last item
-			sleepDuration := 2 * time.Second
-			if failureCount > successCount { // If we're having issues, slow down more
-				sleepDuration = 5 * time.Second
+		// Rate limiting
+		if i < len(items)-1 {
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	// 5. Scrape remaining Groww slugs not found in Chittorgarh's list (Edge Case)
+	if len(pendingSlugs) > 0 {
+		logrus.Infof("Processing %d remaining Groww slugs not found in Chittorgarh...", len(pendingSlugs))
+		for slug := range pendingSlugs {
+			growwData := j.GrowwScraper.ScrapeIPO(ctx, slug)
+			if growwData.DetailsError == "" && growwData.Details != nil {
+				ipoModel := j.GrowwMapper.MapToIPO(growwData, nil)
+				
+				if err := j.IPOService.UpsertIPO(ctx, *ipoModel); err != nil {
+					logrus.Errorf("Failed to upsert Groww-only IPO %s: %v", slug, err)
+					failureCount++
+				} else {
+					successCount++
+					growwWins++
+					logrus.Infof("Successfully saved Groww-only IPO: %s", slug)
+				}
+				time.Sleep(2 * time.Second)
 			}
-			time.Sleep(sleepDuration)
 		}
 	}
 
@@ -107,11 +163,10 @@ func (j *DailyIPOUpdateJob) Run() {
 		"full_success":         successCount,
 		"partial_success":      partialSuccessCount,
 		"failures":             failureCount,
-		"full_success_rate":    float64(successCount) / float64(totalProcessed) * 100,
+		"groww_successes":      growwWins,
+		"chittorgarh_fallbacks": chittWins,
 		"overall_success_rate": float64(successCount+partialSuccessCount) / float64(totalProcessed) * 100,
-	}).Infof("Simplified Daily IPO Update Job completed: %d full success, %d partial success, %d failed out of %d total (%.1f%% overall success rate)",
-		successCount, partialSuccessCount, failureCount, totalProcessed,
-		float64(successCount+partialSuccessCount)/float64(totalProcessed)*100)
+	}).Infof("Daily IPO Update Job completed")
 }
 
 // DataCompleteness represents the completeness analysis of an IPO record
