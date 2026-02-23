@@ -104,3 +104,13 @@ func (h *V2AdminHandler) GetGMPHistoryJobMetrics(c *fiber.Ctx) error {
 
 	return c.JSON(shared.NewV2Response(data))
 }
+
+// CreateIPO wraps the v1 IPO creation in a v2 response envelope
+func (h *V2AdminHandler) CreateIPO(c *fiber.Ctx) error {
+	return h.LegacyHandler.CreateIPO(c)
+}
+
+// GetGMPData wraps the v1 GMP data retrieval in a v2 response envelope
+func (h *V2AdminHandler) GetGMPData(c *fiber.Ctx) error {
+	return h.LegacyHandler.GetGMPData(c)
+}

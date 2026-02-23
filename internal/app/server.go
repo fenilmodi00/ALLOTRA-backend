@@ -122,7 +122,7 @@ func Run(cfg *config.Config) error {
 
 	app := fiber.New(fiber.Config{BodyLimit: 4 * 1024 * 1024})
 	registerMiddleware(app)
-	registerRoutes(app, db, cfg, ipoHandler, cacheHandler, adminHandler, checkHandler, marketHandler, gmpHandler, gmpHistoryHandler, performanceHandler)
+	registerRoutes(app, db, cfg, ipoHandler, cacheHandler, adminHandler, checkHandler, marketHandler, gmpHandler, gmpHistoryHandler, performanceHandler, ipoService)
 
 	serverErrors := make(chan error, 1)
 	go func() {
@@ -189,6 +189,7 @@ func registerRoutes(
 	gmpHandler *handlers.GMPHandler,
 	gmpHistoryHandler *handlers.GMPHistoryHandler,
 	performanceHandler *handlers.PerformanceHandler,
+	ipoService *services.IPOService,
 ) {
 	app.Get("/health", func(c *fiber.Ctx) error {
 		pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -250,6 +251,7 @@ func registerRoutes(
 	api.Get("/cache/:ipo_id/:pan_hash", cacheHandler.GetCachedResult)
 	api.Post("/check", checkHandler.CheckAllotment)
 
+	// V1 Admin Group
 	admin := api.Group("/admin", adminAuthMiddleware(cfg.AdminToken))
 	admin.Post("/ipos", adminHandler.CreateIPO)
 	admin.Post("/gmp/update", adminHandler.TriggerGMPUpdate)
@@ -257,6 +259,28 @@ func registerRoutes(
 	admin.Post("/gmp-history/update", adminHandler.TriggerGMPHistoryUpdate)
 	admin.Get("/gmp-history/status", adminHandler.GetGMPHistoryJobStatus)
 	admin.Get("/gmp-history/metrics", adminHandler.GetGMPHistoryJobMetrics)
+
+	// V2 Handlers
+	v2IpoHandler := handlers.NewV2IPOHandler(ipoService)
+	v2GmpHistoryHandler := handlers.NewV2GMPHistoryHandler(gmpHistoryHandler)
+	v2AdminHandler := handlers.NewV2AdminHandler(adminHandler)
+
+	// V2 Public API Group
+	v2 := api.Group("/v2")
+	v2.Get("/ipos/feed", v2IpoHandler.GetFeed)
+	v2.Get("/ipos/:id", v2IpoHandler.GetByID)
+
+	// V2 GMP History
+	v2.Get("/gmp/history/:ipo_id/chart", v2GmpHistoryHandler.GetChartData)
+
+	// V2 Admin Group (within admin auth middleware)
+	v2Admin := v2.Group("/admin", adminAuthMiddleware(cfg.AdminToken))
+	v2Admin.Post("/ipos", v2AdminHandler.CreateIPO)
+	v2Admin.Post("/gmp/update", v2AdminHandler.TriggerGMPUpdate)
+	v2Admin.Get("/gmp/data", v2AdminHandler.GetGMPData)
+	v2Admin.Post("/gmp-history/update", v2AdminHandler.TriggerGMPHistoryUpdate)
+	v2Admin.Get("/gmp-history/status", v2AdminHandler.GetGMPHistoryJobStatus)
+	v2Admin.Get("/gmp-history/metrics", v2AdminHandler.GetGMPHistoryJobMetrics)
 
 	// Groww IPO scraper — testing & trigger endpoints
 
