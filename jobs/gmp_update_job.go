@@ -12,6 +12,7 @@ import (
 type GMPUpdateJob struct {
 	DB               *sql.DB
 	SimpleGMPService *services.SimpleGMPService
+	CacheService     *services.CacheService
 	ticker           *time.Ticker
 	stopChan         chan struct{}
 	stopOnce         sync.Once
@@ -19,10 +20,11 @@ type GMPUpdateJob struct {
 	isRunning        bool
 }
 
-func NewGMPUpdateJob(db *sql.DB) *GMPUpdateJob {
+func NewGMPUpdateJob(db *sql.DB, cacheService *services.CacheService) *GMPUpdateJob {
 	return &GMPUpdateJob{
 		DB:               db,
 		SimpleGMPService: services.NewSimpleGMPService(db),
+		CacheService:     cacheService,
 		stopChan:         make(chan struct{}),
 	}
 }
@@ -98,6 +100,13 @@ func (j *GMPUpdateJob) Run() {
 	if len(gmpData) == 0 {
 		logrus.Warn("GMP Update Job: no GMP data fetched from source")
 		return
+	}
+
+	// Invalidate IPO cache after successful GMP update
+	if j.CacheService != nil {
+		logrus.Info("Invalidating IPO cache after GMP update...")
+		j.CacheService.Clear()
+		logrus.Info("IPO cache invalidated successfully")
 	}
 
 	duration := time.Since(startTime)

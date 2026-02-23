@@ -79,7 +79,7 @@ func Run(cfg *config.Config) error {
 	dailyJob := jobs.NewDailyIPOUpdateJob(scrapingService, growwScraper, growwMapper, ipoService, utilityService)
 	resultJob := jobs.NewResultReleaseCheckJob(ipoService)
 	cleanupJob := jobs.NewCacheCleanupJob(cacheService)
-	gmpJob := jobs.NewGMPUpdateJob(db)
+	gmpJob := jobs.NewGMPUpdateJob(db, cacheService)
 	gmpHistoryService := services.NewGMPHistoryService(db)
 	gmpHistoryJob := jobs.NewGMPHistoryUpdateJobWithService(db, gmpHistoryService)
 
@@ -265,8 +265,8 @@ func registerRoutes(
 	v2GmpHistoryHandler := handlers.NewV2GMPHistoryHandler(gmpHistoryHandler)
 	v2AdminHandler := handlers.NewV2AdminHandler(adminHandler)
 
-	// V2 Public API Group
-	v2 := api.Group("/v2")
+	// V2 Public API Group (root level /api/v2)
+	v2 := app.Group("/api/v2")
 	v2.Get("/ipos/feed", v2IpoHandler.GetFeed)
 	v2.Get("/ipos/:id", v2IpoHandler.GetByID)
 
