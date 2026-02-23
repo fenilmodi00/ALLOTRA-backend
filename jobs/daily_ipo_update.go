@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/fenilmodi00/ipo-backend/models"
@@ -182,20 +183,76 @@ func (j *DailyIPOUpdateJob) Run() {
 	// 5. Scrape remaining Groww slugs not found in Chittorgarh's list (Edge Case)
 	if len(pendingSlugs) > 0 {
 		logrus.Infof("Processing %d remaining Groww slugs not found in Chittorgarh...", len(pendingSlugs))
-		for slug := range pendingSlugs {
-			growwData := j.GrowwScraper.ScrapeIPO(ctx, slug)
-			if growwData.DetailsError == "" && growwData.Details != nil {
-				ipoModel := j.GrowwMapper.MapToIPO(growwData, nil)
 
-				if err := j.IPOService.UpsertIPO(ctx, *ipoModel); err != nil {
-					logrus.Errorf("Failed to upsert Groww-only IPO %s: %v", slug, err)
+		circuitBreakerFailedSlugs := make(map[string]bool)
+		maxRetries := 2
+		retryDelay := 30 * time.Second
+
+		for retry := 0; retry <= maxRetries; retry++ {
+			if retry > 0 && len(circuitBreakerFailedSlugs) > 0 {
+				logrus.Infof("Retry %d/%d: Processing %d slugs that failed due to circuit breaker",
+					retry, maxRetries, len(circuitBreakerFailedSlugs))
+				time.Sleep(retryDelay)
+			}
+
+			currentBatch := make(map[string]bool)
+			if retry == 0 {
+				for slug := range pendingSlugs {
+					currentBatch[slug] = true
+				}
+			} else {
+				for slug := range circuitBreakerFailedSlugs {
+					currentBatch[slug] = true
+				}
+				circuitBreakerFailedSlugs = make(map[string]bool)
+			}
+
+			for slug := range currentBatch {
+				growwData := j.GrowwScraper.ScrapeIPO(ctx, slug)
+
+				if strings.Contains(growwData.DetailsError, "circuit breaker is open") ||
+					strings.Contains(growwData.CMSError, "circuit breaker is open") {
+					circuitBreakerFailedSlugs[slug] = true
+					logrus.WithFields(logrus.Fields{
+						"slug":        slug,
+						"retry":       retry,
+						"max_retries": maxRetries,
+					}).Warn("Circuit breaker open - queuing for retry")
+					continue
+				}
+
+				if growwData.DetailsError == "" && growwData.Details != nil {
+					ipoModel := j.GrowwMapper.MapToIPO(growwData, nil)
+
+					if err := j.IPOService.UpsertIPO(ctx, *ipoModel); err != nil {
+						logrus.Errorf("Failed to upsert Groww-only IPO %s: %v", slug, err)
+						failureCount++
+					} else {
+						successCount++
+						growwWins++
+						logrus.Infof("Successfully saved Groww-only IPO: %s", slug)
+					}
+				} else if retry == maxRetries {
+					logrus.WithFields(logrus.Fields{
+						"slug":          slug,
+						"details_error": growwData.DetailsError,
+						"cms_error":     growwData.CMSError,
+					}).Warn("Failed to scrape IPO after all retries")
 					failureCount++
-				} else {
-					successCount++
-					growwWins++
-					logrus.Infof("Successfully saved Groww-only IPO: %s", slug)
 				}
 				time.Sleep(2 * time.Second)
+			}
+
+			if len(circuitBreakerFailedSlugs) == 0 {
+				break
+			}
+		}
+
+		if len(circuitBreakerFailedSlugs) > 0 {
+			logrus.Warnf("Still have %d slugs that failed after all retries - consider manual review",
+				len(circuitBreakerFailedSlugs))
+			for slug := range circuitBreakerFailedSlugs {
+				logrus.Warnf("Pending IPO slug requiring manual review: %s", slug)
 			}
 		}
 	}

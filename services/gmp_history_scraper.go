@@ -776,7 +776,9 @@ func (s *GMPPriceHistoryScraper) parseDateWithStatus(dateStr string) (time.Time,
 	// Remove status keywords
 	statusKeywords := []string{
 		" Allotment", " Close", " Open", " Listed", " Result",
-		" Announcement", " Launch", " End", " Start",
+		" Announcement", " Launch", " End", " Start", " Listing",
+		" allotment", " close", " open", " listed", " result",
+		" announcement", " launch", " end", " start", " listing",
 	}
 
 	cleanDate := dateStr
@@ -980,34 +982,86 @@ func (s *GMPPriceHistoryScraper) findNumericIDFromAPIURLList(companyCode, ipoNam
 	normalizedName := s.normalizeIPOName(ipoName)
 	nameWords := strings.Fields(normalizedName)
 
+exactMatch:
 	for _, item := range candidates {
 		if item.code == normalizedCode {
-			return item.numericID, nil
+			exactMatches := 0
+			exactMatchID := item.numericID
+			for _, c := range candidates {
+				if c.code == normalizedCode {
+					exactMatches++
+					exactMatchID = c.numericID
+				}
+			}
+			if exactMatches == 1 {
+				itemNameScore := s.calculateNameSimilarity(normalizedName, s.normalizeIPOName(item.name), nameWords)
+				if itemNameScore > 0.7 {
+					return exactMatchID, nil
+				}
+				s.logger.WithFields(logrus.Fields{
+					"company_code": companyCode,
+					"ipo_name":     ipoName,
+					"matched_name": item.name,
+					"name_score":   itemNameScore,
+					"numeric_id":   exactMatchID,
+				}).Warn("Exact code match found but name doesn't match well - verifying identity")
+				if itemNameScore > 0.5 {
+					return exactMatchID, nil
+				}
+				break exactMatch
+			}
+			break exactMatch
 		}
 	}
 
 	variations := s.generateCompanyCodeVariations(normalizedCode)
+	matchedIDs := make(map[string]int)
 	for _, variation := range variations {
 		normalizedVariation := normalizeCompanyCode(variation)
+		// Only use exact equality — never substring matching.
+		// strings.Contains() caused short codes like "krl" to match inside
+		// longer unrelated codes (e.g., "sparkrl"), returning wrong numeric IDs.
 		for _, item := range candidates {
-			if item.code == normalizedVariation || strings.Contains(item.code, normalizedVariation) || strings.Contains(normalizedVariation, item.code) {
-				return item.numericID, nil
+			if item.code == normalizedVariation {
+				matchedIDs[item.numericID]++
 			}
 		}
 	}
 
+	if len(matchedIDs) == 1 {
+		for id := range matchedIDs {
+			return id, nil
+		}
+	} else if len(matchedIDs) > 1 {
+		s.logger.WithFields(logrus.Fields{
+			"company_code": companyCode,
+			"matched_ids":  matchedIDs,
+		}).Warn("Multiple fuzzy matches found - rejecting ambiguous match")
+	}
+
 	bestScore := 0.0
 	bestNumericID := ""
+	matchCount := 0
 	for _, item := range candidates {
 		score := s.calculateNameSimilarity(normalizedName, s.normalizeIPOName(item.name), nameWords)
-		if score > bestScore && score > 0.5 {
+		if score > bestScore && score > 0.6 {
 			bestScore = score
 			bestNumericID = item.numericID
+			matchCount = 1
+		} else if score == bestScore && score > 0.6 {
+			matchCount++
 		}
 	}
 
-	if bestNumericID != "" {
+	if matchCount == 1 && bestNumericID != "" {
 		return bestNumericID, nil
+	} else if matchCount > 1 {
+		s.logger.WithFields(logrus.Fields{
+			"company_code": companyCode,
+			"ipo_name":     ipoName,
+			"match_count":  matchCount,
+			"best_score":   bestScore,
+		}).Warn("Multiple name similarity matches - rejecting ambiguous match")
 	}
 
 	return "", fmt.Errorf("no matching IPO found in InvestorGain API URL list for %s (%s)", ipoName, companyCode)
@@ -1114,9 +1168,11 @@ func (s *GMPPriceHistoryScraper) findByFuzzyCompanyCode(htmlContent, companyCode
 		urlCode := match[1]
 		numericID := match[2]
 
-		// Check if any variation matches
+		// Check if any variation matches — exact equality only.
+		// Never use strings.Contains() here: short codes like "krl"
+		// would substring-match inside unrelated URL slugs.
 		for _, variation := range variations {
-			if urlCode == variation || strings.Contains(urlCode, variation) || strings.Contains(variation, urlCode) {
+			if urlCode == variation {
 				s.logger.WithFields(logrus.Fields{
 					"original_code": companyCode,
 					"matched_code":  urlCode,
@@ -1240,16 +1296,19 @@ func (s *GMPPriceHistoryScraper) generateCompanyCodeVariations(code string) []st
 	variations = append(variations, strings.ReplaceAll(code, "-", "_"))
 	variations = append(variations, strings.ReplaceAll(code, "_", "-"))
 
-	// Add variations without common suffixes
-	suffixes := []string{"-ipo-details", "-details", "-ipo", "-india", "-ltd", "-limited", "-pvt", "-technologies", "-tech", "-systems"}
-	for _, suffix := range suffixes {
+	// Only strip URL-noise suffixes that never distinguish companies.
+	// DO NOT strip semantically meaningful suffixes like "-india", "-ltd",
+	// "-technologies", "-systems" etc. — those differentiate companies
+	// (e.g., "manilam-industries-india" vs "manilam-industries" are DIFFERENT IPOs).
+	noiseSuffixes := []string{"-ipo-details", "-details", "-ipo"}
+	for _, suffix := range noiseSuffixes {
 		if strings.HasSuffix(code, suffix) {
 			variations = append(variations, strings.TrimSuffix(code, suffix))
 		}
 	}
 
-	// Add variations with common suffixes
-	for _, suffix := range suffixes {
+	// Add variations with noise suffixes only
+	for _, suffix := range noiseSuffixes {
 		if !strings.HasSuffix(code, suffix) {
 			variations = append(variations, code+suffix)
 		}
@@ -1380,23 +1439,32 @@ func (s *GMPPriceHistoryScraper) ValidateScrapedData(data *ScrapedHistoryData) e
 		return fmt.Errorf("no price history entries found")
 	}
 
-	// Validate each entry and fail fast on invalid data
+	// Validate each entry and skip invalid data, continue processing if at least one valid entry exists
 	validEntries := 0
+	validPriceHistory := make([]models.GMPPriceHistoryEntry, 0, len(data.PriceHistory))
 	for idx := range data.PriceHistory {
 		entry := &data.PriceHistory[idx]
 		if err := s.validateHistoryEntryLenient(entry); err != nil {
 			logger.WithFields(logrus.Fields{
 				"entry_index": idx,
 				"error":       err.Error(),
-			}).Warn("Entry validation failed")
-			return fmt.Errorf("validation failed for entry %d: %w", idx, err)
+				"record_date": entry.RecordDate.Format("2006-01-02"),
+			}).Warn("Skipping invalid entry - continuing with remaining entries")
+			continue
 		}
 		validEntries++
+		validPriceHistory = append(validPriceHistory, *entry)
 	}
 
 	if validEntries == 0 {
-		return fmt.Errorf("no valid price history entries found")
+		return fmt.Errorf("no valid price history entries found after validation")
 	}
+
+	data.PriceHistory = validPriceHistory
+	logger.WithFields(logrus.Fields{
+		"original_entries": len(data.PriceHistory),
+		"valid_entries":    validEntries,
+	}).Info("Filtered to valid entries only")
 
 	logger.WithFields(logrus.Fields{
 		"total_entries": len(data.PriceHistory),

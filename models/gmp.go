@@ -114,6 +114,18 @@ type ChartDataResponse struct {
 	ChartData  []ChartPoint    `json:"chart_data"`
 	Statistics ChartStatistics `json:"statistics"`
 	Metadata   ChartMetadata   `json:"metadata"`
+	CurrentGMP *CurrentGMP     `json:"current_gmp,omitempty"`
+}
+
+// CurrentGMP represents current GMP from ipo_gmp table
+type CurrentGMP struct {
+	GMPValue           float64   `json:"gmp_value"`
+	GainPercent        float64   `json:"gain_percent"`
+	EstimatedListing   float64   `json:"estimated_listing"`
+	LastUpdated        time.Time `json:"last_updated"`
+	StockID            int       `json:"stock_id"`
+	SubscriptionStatus string    `json:"subscription_status"`
+	IPOStatus          string    `json:"ipo_status"`
 }
 
 // IPOBasicInfo contains basic IPO information for chart context
@@ -146,6 +158,7 @@ type ChartStatistics struct {
 // ChartMetadata contains metadata for the chart data response
 type ChartMetadata struct {
 	DataSource     string    `json:"data_source"`
+	GMPDataSource  string    `json:"gmp_data_source,omitempty"`
 	LastUpdated    time.Time `json:"last_updated"`
 	TotalRecords   int       `json:"total_records"`
 	DateRangeStart string    `json:"date_range_start,omitempty"`

@@ -16,7 +16,7 @@ import (
 
 // GMPHistoryService handles business logic for GMP price history management
 type GMPHistoryService struct {
-	db                 *sql.DB
+	DB                 *sql.DB
 	logger             *logrus.Logger
 	scraper            *GMPPriceHistoryScraper
 	utilityService     *UtilityService
@@ -45,7 +45,7 @@ func NewGMPHistoryService(db *sql.DB) *GMPHistoryService {
 	scraper := NewGMPPriceHistoryScraper(db)
 
 	service := &GMPHistoryService{
-		db:              db,
+		DB:              db,
 		logger:          logger,
 		scraper:         scraper,
 		utilityService:  NewUtilityService(),
@@ -71,7 +71,7 @@ func (s *GMPHistoryService) ResolveIPOIdentifier(identifier string) (string, err
 	if identifier == "" {
 		return "", fmt.Errorf("identifier is required")
 	}
-	if s.db == nil {
+	if s.DB == nil {
 		return "", fmt.Errorf("%w: database connection is not initialized", ErrServiceUnavailable)
 	}
 
@@ -84,7 +84,7 @@ func (s *GMPHistoryService) ResolveIPOIdentifier(identifier string) (string, err
 	// Not a UUID, try to look up by stock_id
 	var ipoID string
 	query := `SELECT id FROM ipo_list WHERE stock_id = $1 LIMIT 1`
-	err := s.db.QueryRow(query, identifier).Scan(&ipoID)
+	err := s.DB.QueryRow(query, identifier).Scan(&ipoID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "", fmt.Errorf("no IPO found with stock_id: %s", identifier)
@@ -173,7 +173,7 @@ func (s *GMPHistoryService) GetPriceHistoryByIPO(ipoID string, dateRange *models
 	if ipoID == "" {
 		return nil, fmt.Errorf("ipo_id is required")
 	}
-	if s.db == nil {
+	if s.DB == nil {
 		return nil, fmt.Errorf("%w: database connection is not initialized", ErrServiceUnavailable)
 	}
 
@@ -240,7 +240,7 @@ func (s *GMPHistoryService) GetPriceHistoryByIPO(ipoID string, dateRange *models
 	query += " ORDER BY h.record_date DESC"
 
 	// Execute query
-	rows, err := s.db.Query(query, args...)
+	rows, err := s.DB.Query(query, args...)
 	if err != nil {
 		s.logger.WithFields(logrus.Fields{
 			"ipo_id":     ipoID,
@@ -403,20 +403,20 @@ func (s *GMPHistoryService) ScrapeIPOPriceHistoryWithNameAndStockID(ipoID string
 	if ipoID == "" || companyCode == "" {
 		return nil, fmt.Errorf("ipoID and companyCode are required")
 	}
-	if s.db == nil || s.scraper == nil {
+	if s.DB == nil || s.scraper == nil {
 		return nil, fmt.Errorf("%w: scraping dependencies are not initialized", ErrServiceUnavailable)
 	}
 
 	// Get stock_id if not provided
 	if stockID == "" {
-		err := s.db.QueryRow("SELECT stock_id FROM ipo_list WHERE id = $1", ipoID).Scan(&stockID)
+		err := s.DB.QueryRow("SELECT stock_id FROM ipo_list WHERE id = $1", ipoID).Scan(&stockID)
 		if err != nil {
 			s.logger.WithError(err).Warn("Failed to get stock_id, will use UUID for API")
 		}
 	}
 
 	if ipoName == "" {
-		err := s.db.QueryRow("SELECT name FROM ipo_list WHERE id = $1", ipoID).Scan(&ipoName)
+		err := s.DB.QueryRow("SELECT name FROM ipo_list WHERE id = $1", ipoID).Scan(&ipoName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get IPO name: %w", err)
 		}
@@ -485,7 +485,7 @@ func (s *GMPHistoryService) ScrapeIPOPriceHistoryWithNameAndStockID(ipoID string
 	// Backfill missing IPO price from local IPO metadata so validation and
 	// persistence remain consistent.
 	var fallbackPrice float64
-	if priceErr := s.db.QueryRow("SELECT COALESCE(price_band_high, price_band_low, 0) FROM ipo_list WHERE id = $1", ipoID).Scan(&fallbackPrice); priceErr != nil {
+	if priceErr := s.DB.QueryRow("SELECT COALESCE(price_band_high, price_band_low, 0) FROM ipo_list WHERE id = $1", ipoID).Scan(&fallbackPrice); priceErr != nil {
 		s.logger.WithError(priceErr).WithField("ipo_id", ipoID).Debug("Failed to load fallback IPO price")
 	}
 
@@ -511,6 +511,29 @@ func (s *GMPHistoryService) ScrapeIPOPriceHistoryWithNameAndStockID(ipoID string
 	// Validate scraped data
 	if err := s.scraper.ValidateScrapedData(scrapedData); err != nil {
 		return nil, fmt.Errorf("scraped data validation failed: %w", err)
+	}
+
+	// Date sanity check: reject scraped data that clearly belongs to a different IPO.
+	// If the IPO has an open_date and the scraped data contains records from more than
+	// 90 days before that date, the InvestorGain numeric ID was resolved to the wrong
+	// IPO (e.g., "manilam-industries-india" matched "manilam-industries" from 2023).
+	var openDate sql.NullTime
+	if dbErr := s.DB.QueryRow("SELECT open_date FROM ipo_list WHERE id = $1", ipoID).Scan(&openDate); dbErr == nil && openDate.Valid {
+		cutoff := openDate.Time.AddDate(0, -3, 0) // 90 days before open
+		for _, entry := range scrapedData.PriceHistory {
+			if entry.RecordDate.Before(cutoff) {
+				s.logger.WithFields(logrus.Fields{
+					"ipo_id":       ipoID,
+					"company_code": companyCode,
+					"ipo_name":     ipoName,
+					"open_date":    openDate.Time.Format("2006-01-02"),
+					"record_date":  entry.RecordDate.Format("2006-01-02"),
+					"cutoff":       cutoff.Format("2006-01-02"),
+				}).Error("Scraped data contains records from before IPO open date — likely wrong InvestorGain ID match, rejecting all data")
+				return nil, fmt.Errorf("scraped data date sanity check failed: record_date %s is before IPO open_date %s minus 90 days for %s (%s)",
+					entry.RecordDate.Format("2006-01-02"), openDate.Time.Format("2006-01-02"), ipoName, companyCode)
+			}
+		}
 	}
 
 	// Use the IPO name we already fetched from database
@@ -630,7 +653,7 @@ func (s *GMPHistoryService) ProcessAllActiveIPOHistory() (*models.ProcessingResu
 		LIMIT 200
 	`
 
-	rows, err := s.db.Query(query, models.StatusLive, models.StatusUpcoming, models.StatusClosed, models.StatusResultOut, models.StatusListed)
+	rows, err := s.DB.Query(query, models.StatusLive, models.StatusUpcoming, models.StatusClosed, models.StatusResultOut, models.StatusListed)
 	if err != nil {
 		metrics.EndTime = time.Now()
 		metrics.ProcessingTime = metrics.EndTime.Sub(metrics.StartTime)
@@ -796,7 +819,7 @@ func (s *GMPHistoryService) createJobLog(jobLog *models.GMPHistoryJobLog) error 
 		) VALUES ($1, $2, $3, $4)
 	`
 
-	_, err := s.db.Exec(query,
+	_, err := s.DB.Exec(query,
 		jobLog.ID,
 		jobLog.JobStartTime,
 		jobLog.ExecutionStatus,
@@ -842,7 +865,7 @@ func (s *GMPHistoryService) updateJobLogOnSuccess(jobLogID string, metrics *Proc
 		status = "completed_with_errors"
 	}
 
-	_, err := s.db.Exec(query,
+	_, err := s.DB.Exec(query,
 		metrics.EndTime,
 		metrics.TotalIPOs,
 		metrics.SuccessCount,
@@ -870,7 +893,7 @@ func (s *GMPHistoryService) updateJobLogOnError(jobLogID string, metrics *Proces
 		WHERE id = $7
 	`
 
-	_, err := s.db.Exec(query,
+	_, err := s.DB.Exec(query,
 		metrics.EndTime,
 		metrics.TotalIPOs,
 		metrics.SuccessCount,
@@ -915,7 +938,7 @@ func (s *GMPHistoryService) GetArchivalStatistics() (map[string]interface{}, err
 	var activeRecords int
 	var oldestDate sql.NullTime
 	var newestDate sql.NullTime
-	err := s.db.QueryRow("SELECT COUNT(*), MIN(record_date), MAX(record_date) FROM gmp_price_history").Scan(&activeRecords, &oldestDate, &newestDate)
+	err := s.DB.QueryRow("SELECT COUNT(*), MIN(record_date), MAX(record_date) FROM gmp_price_history").Scan(&activeRecords, &oldestDate, &newestDate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count active records: %w", err)
 	}
@@ -923,7 +946,7 @@ func (s *GMPHistoryService) GetArchivalStatistics() (map[string]interface{}, err
 
 	// Count archived records (if archive table exists)
 	var archivedRecords int
-	err = s.db.QueryRow("SELECT COUNT(*) FROM gmp_price_history_archive").Scan(&archivedRecords)
+	err = s.DB.QueryRow("SELECT COUNT(*) FROM gmp_price_history_archive").Scan(&archivedRecords)
 	if err != nil {
 		// Archive table might not exist yet
 		archivedRecords = 0
@@ -941,7 +964,7 @@ func (s *GMPHistoryService) GetArchivalStatistics() (map[string]interface{}, err
 
 	// Get total archival operations count
 	var archivalOpsCount int
-	err = s.db.QueryRow("SELECT COUNT(*) FROM gmp_archival_log").Scan(&archivalOpsCount)
+	err = s.DB.QueryRow("SELECT COUNT(*) FROM gmp_archival_log").Scan(&archivalOpsCount)
 	if err == nil {
 		stats["total_archival_operations"] = archivalOpsCount
 	}
@@ -949,7 +972,7 @@ func (s *GMPHistoryService) GetArchivalStatistics() (map[string]interface{}, err
 	// Get last archival operation
 	var lastArchivalTime sql.NullTime
 	var lastArchivalRecords sql.NullInt64
-	err = s.db.QueryRow(`
+	err = s.DB.QueryRow(`
 		SELECT end_time, records_archived 
 		FROM gmp_archival_log 
 		WHERE archival_status = 'success' 
@@ -1032,7 +1055,7 @@ func (s *GMPHistoryService) WarmupCache(ctx context.Context) error {
 
 	// Get IPOs from last 2 months (most popular)
 	twoMonthsAgo := time.Now().AddDate(0, -2, 0)
-	rows, err := s.db.QueryContext(ctx, query, twoMonthsAgo, models.StatusLive, models.StatusUpcoming, models.StatusClosed, models.StatusResultOut, models.StatusListed)
+	rows, err := s.DB.QueryContext(ctx, query, twoMonthsAgo, models.StatusLive, models.StatusUpcoming, models.StatusClosed, models.StatusResultOut, models.StatusListed)
 	if err != nil {
 		return fmt.Errorf("failed to query popular IPOs: %w", err)
 	}
@@ -1164,4 +1187,47 @@ func (s *GMPHistoryService) IsServiceHealthy() bool {
 	}
 
 	return true
+}
+
+// GetCurrentGMP retrieves current GMP from ipo_gmp table for consistency with /with-gmp endpoint
+func (s *GMPHistoryService) GetCurrentGMP(ipoID string) (*models.CurrentGMP, error) {
+	if s.DB == nil {
+		return nil, fmt.Errorf("database not available")
+	}
+
+	query := `
+		SELECT g.gmp_value, g.gain_percent, g.estimated_listing, g.last_updated, 
+		       g.stock_id, g.subscription_status, g.ipo_status
+		FROM ipo_gmp g
+		WHERE g.ipo_id = $1
+		ORDER BY g.last_updated DESC
+		LIMIT 1
+	`
+
+	row := s.DB.QueryRow(query, ipoID)
+	var gmp models.CurrentGMP
+	var lastUpdated sql.NullTime
+
+	err := row.Scan(
+		&gmp.GMPValue,
+		&gmp.GainPercent,
+		&gmp.EstimatedListing,
+		&lastUpdated,
+		&gmp.StockID,
+		&gmp.SubscriptionStatus,
+		&gmp.IPOStatus,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current GMP: %w", err)
+	}
+
+	if lastUpdated.Valid {
+		gmp.LastUpdated = lastUpdated.Time
+	}
+
+	return &gmp, nil
 }

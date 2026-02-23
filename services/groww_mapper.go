@@ -36,6 +36,11 @@ func (m *GrowwMapper) MapToIPO(growwData *models.GrowwScrapedIPO, chittItem *Chi
 		ipo.Symbol = &d.Symbol
 		ipo.Registrar = d.Registrar
 
+		// Map logo URL from Groww
+		if d.LogoURL != "" {
+			ipo.LogoURL = &d.LogoURL
+		}
+
 		if t, err := time.Parse("2006-01-02", d.StartDate); err == nil {
 			ipo.OpenDate = &t
 		}

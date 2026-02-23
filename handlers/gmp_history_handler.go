@@ -219,6 +219,23 @@ func (h *GMPHistoryHandler) GetChartData(c *fiber.Ctx) error {
 	// Enhance metadata (Requirement 3.5)
 	chartResponse.Metadata.TotalRecords = len(history.Entries)
 
+	// Also fetch current GMP from ipo_gmp table for consistency with /with-gmp endpoint
+	if h.Service != nil && h.Service.DB != nil {
+		currentGMP, err := h.Service.GetCurrentGMP(ipoID)
+		if err == nil && currentGMP != nil {
+			chartResponse.CurrentGMP = &models.CurrentGMP{
+				GMPValue:           currentGMP.GMPValue,
+				GainPercent:        currentGMP.GainPercent,
+				EstimatedListing:   currentGMP.EstimatedListing,
+				LastUpdated:        currentGMP.LastUpdated,
+				StockID:            currentGMP.StockID,
+				SubscriptionStatus: currentGMP.SubscriptionStatus,
+				IPOStatus:          currentGMP.IPOStatus,
+			}
+			chartResponse.Metadata.GMPDataSource = "ipo_gmp"
+		}
+	}
+
 	// Return chart-optimized response (Requirements 3.1, 3.5)
 	return c.JSON(fiber.Map{
 		"success": true,
