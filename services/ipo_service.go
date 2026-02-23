@@ -940,15 +940,43 @@ func (s *IPOService) CreateIPO(ctx context.Context, ipo *models.IPO) error {
 		ipo.Slug = &slug
 	}
 
+	// Set default JSON values if nil
+	if ipo.FormFields == nil {
+		ipo.FormFields = json.RawMessage("{}")
+	}
+	if ipo.FormHeaders == nil {
+		ipo.FormHeaders = json.RawMessage("{}")
+	}
+	if ipo.ParserConfig == nil {
+		ipo.ParserConfig = json.RawMessage("{}")
+	}
+	if ipo.Strengths == nil {
+		ipo.Strengths = json.RawMessage("[]")
+	}
+	if ipo.Risks == nil {
+		ipo.Risks = json.RawMessage("[]")
+	}
+	if ipo.Financials == nil {
+		ipo.Financials = json.RawMessage("[]")
+	}
+	if ipo.Categories == nil {
+		ipo.Categories = json.RawMessage("[]")
+	}
+	if ipo.FAQs == nil {
+		ipo.FAQs = json.RawMessage("[]")
+	}
+
 	query := `INSERT INTO ipo_list (name, company_code, description, price_band_low, price_band_high, 
               issue_size, open_date, close_date, result_date, registrar, stock_id, 
-              form_url, form_fields, form_headers, parser_config, status, created_by) 
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id`
+              form_url, form_fields, form_headers, parser_config, status, created_by,
+              strengths, risks, financials, categories, faqs) 
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22) RETURNING id`
 
 	err := s.DB.QueryRowContext(ctx, query,
 		ipo.Name, ipo.CompanyCode, ipo.Description, ipo.PriceBandLow, ipo.PriceBandHigh,
 		ipo.IssueSize, ipo.OpenDate, ipo.CloseDate, ipo.ResultDate, ipo.Registrar, ipo.StockID,
 		ipo.FormURL, ipo.FormFields, ipo.FormHeaders, ipo.ParserConfig, ipo.Status, ipo.CreatedBy,
+		ipo.Strengths, ipo.Risks, ipo.Financials, ipo.Categories, ipo.FAQs,
 	).Scan(&ipo.ID)
 
 	// Log audit entry for creation attempt
@@ -1425,4 +1453,41 @@ func (s *IPOService) ResetMetrics() {
 	}
 
 	logrus.WithField("service", "IPO_Service").Info("All metrics reset")
+}
+
+const (
+	TTLUpcoming = 12 * time.Hour
+	TTLActive   = 12 * time.Hour
+	TTLListed   = 7 * 24 * time.Hour
+)
+
+func (s *IPOService) NeedsRefresh(ctx context.Context, stockID string) (bool, time.Time, error) {
+	query := `SELECT updated_at, status FROM ipo_list WHERE stock_id = $1`
+	row := s.DB.QueryRowContext(ctx, query, stockID)
+
+	var updatedAt time.Time
+	var status string
+	err := row.Scan(&updatedAt, &status)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return true, time.Time{}, nil
+		}
+		return false, time.Time{}, fmt.Errorf("failed to check IPO refresh status: %w", err)
+	}
+
+	ttl := s.getTTLForStatus(status)
+	needsRefresh := time.Since(updatedAt) > ttl
+
+	return needsRefresh, updatedAt, nil
+}
+
+func (s *IPOService) getTTLForStatus(status string) time.Duration {
+	switch strings.ToUpper(status) {
+	case "UPCOMING", "ACTIVE":
+		return TTLUpcoming
+	case "LISTED":
+		return TTLListed
+	default:
+		return TTLActive
+	}
 }

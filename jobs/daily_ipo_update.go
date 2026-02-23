@@ -15,6 +15,7 @@ type DailyIPOUpdateJob struct {
 	GrowwMapper     *services.GrowwMapper
 	IPOService      *services.IPOService
 	UtilityService  *services.UtilityService
+	MatcherService  *services.MatcherService
 }
 
 func NewDailyIPOUpdateJob(
@@ -24,12 +25,14 @@ func NewDailyIPOUpdateJob(
 	ipoService *services.IPOService,
 	utilityService *services.UtilityService,
 ) *DailyIPOUpdateJob {
+	matcherService := services.NewMatcherService(utilityService)
 	return &DailyIPOUpdateJob{
 		ScrapingService: scrapingService,
 		GrowwScraper:    growwScraper,
 		GrowwMapper:     growwMapper,
 		IPOService:      ipoService,
 		UtilityService:  utilityService,
+		MatcherService:  matcherService,
 	}
 }
 
@@ -44,12 +47,15 @@ func (j *DailyIPOUpdateJob) Run() {
 	if err != nil {
 		logrus.Errorf("Failed to discover Groww slugs: %v", err)
 	}
-	
+
 	pendingSlugs := make(map[string]bool)
 	for _, slug := range growwSlugs {
 		pendingSlugs[slug] = true
 	}
-	logrus.Infof("Discovered %d slugs from Groww", len(pendingSlugs))
+
+	// Pre-compute normalized Groww slugs for optimized entity resolution
+	growwSlugCache := j.buildGrowwSlugCache(growwSlugs)
+	logrus.Infof("Discovered %d slugs from Groww (cache built for entity resolution)", len(pendingSlugs))
 
 	// 2. Fetch primary discovery list from Chittorgarh (for absolute maximum coverage)
 	logrus.Info("Fetching IPO list from Chittorgarh scraping service...")
@@ -68,32 +74,61 @@ func (j *DailyIPOUpdateJob) Run() {
 	chittWins := 0
 
 	for i, item := range items {
-		slug := item.URLRewriteFolderName
-		delete(pendingSlugs, slug) // Mark as processed from Chittorgarh list
-		
+		chittorgarhName := item.IPONewsTitle
+		chittorgarhSlug := item.URLRewriteFolderName
+		delete(pendingSlugs, chittorgarhSlug)
+
+		needsRefresh, lastUpdated, err := j.IPOService.NeedsRefresh(ctx, chittorgarhSlug)
+		if err != nil {
+			logrus.WithError(err).Warnf("Failed to check TTL for %s, proceeding with scrape", chittorgarhSlug)
+		} else if !needsRefresh {
+			logrus.WithFields(logrus.Fields{
+				"slug":         chittorgarhSlug,
+				"last_updated": lastUpdated,
+			}).Debug("Skipping IPO - TTL not expired (Smart TTL)")
+			continue
+		}
+
 		logrus.WithFields(logrus.Fields{
 			"ipo_index":  i + 1,
 			"total_ipos": len(items),
-			"ipo_name":   item.IPONewsTitle,
-			"slug":       slug,
-		}).Infof("Processing IPO %d/%d: %s", i+1, len(items), item.IPONewsTitle)
+			"ipo_name":   chittorgarhName,
+			"slug":       chittorgarhSlug,
+		}).Infof("Processing IPO %d/%d: %s", i+1, len(items), chittorgarhName)
 
 		var ipoModel *models.IPO
 
-		// 3. Primary Source: Try Groww Details API
-		growwData := j.GrowwScraper.ScrapeIPO(ctx, slug)
+		// 3. Entity Resolution: Use pre-built cache for optimized slug matching
+		matchedGrowwSlug := j.findMatchingGrowwSlug(chittorgarhSlug, growwSlugCache)
+		if matchedGrowwSlug != "" {
+			logrus.WithFields(logrus.Fields{
+				"chittorgarh_slug": chittorgarhSlug,
+				"groww_slug":       matchedGrowwSlug,
+			}).Info("Matched Chittorgarh IPO to Groww using Entity Resolution")
+		}
+
+		// 4. Primary Source: Try Groww Details API (using matched slug or exact slug match)
+		growwSlugToTry := matchedGrowwSlug
+		if growwSlugToTry == "" {
+			growwSlugToTry = chittorgarhSlug
+		}
+
+		growwData := j.GrowwScraper.ScrapeIPO(ctx, growwSlugToTry)
 		if growwData.DetailsError == "" && growwData.Details != nil {
-			// Groww succeeded! Map its rich data.
 			ipoModel = j.GrowwMapper.MapToIPO(growwData, &item)
 			growwWins++
-			logrus.WithField("slug", slug).Info("Scraped rich data from Groww successfully")
-		} else {
-			// 4. Fallback Source: Chittorgarh Basic JSON Metadata
 			logrus.WithFields(logrus.Fields{
-				"slug":  slug,
-				"error": growwData.DetailsError,
+				"slug":       growwSlugToTry,
+				"chitt_slug": chittorgarhSlug,
+			}).Info("Scraped rich data from Groww successfully (matched via Entity Resolution)")
+		} else {
+			// 5. Fallback Source: Chittorgarh Basic JSON Metadata
+			logrus.WithFields(logrus.Fields{
+				"slug":       growwSlugToTry,
+				"chitt_slug": chittorgarhSlug,
+				"error":      growwData.DetailsError,
 			}).Warn("Groww failed or 404ed, falling back to Chittorgarh")
-			
+
 			ipoModel, err = j.ScrapingService.ScrapeDetailedIPOInformation(item)
 			if err != nil {
 				logrus.Errorf("Failed to scrape details for %s from fallback: %v", item.IPONewsTitle, err)
@@ -142,7 +177,7 @@ func (j *DailyIPOUpdateJob) Run() {
 			growwData := j.GrowwScraper.ScrapeIPO(ctx, slug)
 			if growwData.DetailsError == "" && growwData.Details != nil {
 				ipoModel := j.GrowwMapper.MapToIPO(growwData, nil)
-				
+
 				if err := j.IPOService.UpsertIPO(ctx, *ipoModel); err != nil {
 					logrus.Errorf("Failed to upsert Groww-only IPO %s: %v", slug, err)
 					failureCount++
@@ -159,13 +194,13 @@ func (j *DailyIPOUpdateJob) Run() {
 	// Log comprehensive job completion summary
 	totalProcessed := successCount + partialSuccessCount + failureCount
 	logrus.WithFields(logrus.Fields{
-		"total_processed":      totalProcessed,
-		"full_success":         successCount,
-		"partial_success":      partialSuccessCount,
-		"failures":             failureCount,
-		"groww_successes":      growwWins,
+		"total_processed":       totalProcessed,
+		"full_success":          successCount,
+		"partial_success":       partialSuccessCount,
+		"failures":              failureCount,
+		"groww_successes":       growwWins,
 		"chittorgarh_fallbacks": chittWins,
-		"overall_success_rate": float64(successCount+partialSuccessCount) / float64(totalProcessed) * 100,
+		"overall_success_rate":  float64(successCount+partialSuccessCount) / float64(totalProcessed) * 100,
 	}).Infof("Daily IPO Update Job completed")
 }
 
@@ -341,4 +376,40 @@ func (j *DailyIPOUpdateJob) logFieldPopulation(ipo *models.IPO, completeness Dat
 			"successful_extractions": successfulExtractions,
 		}).Debugf("IPO %s successfully extracted key fields: %v", ipo.Name, successfulExtractions)
 	}
+}
+
+type growwSlugCache struct {
+	original   string
+	normalized string
+}
+
+func (j *DailyIPOUpdateJob) buildGrowwSlugCache(slugs []string) []growwSlugCache {
+	cache := make([]growwSlugCache, 0, len(slugs))
+	for _, slug := range slugs {
+		normalized := j.MatcherService.NormalizeSlugForMatching(slug)
+		cache = append(cache, growwSlugCache{
+			original:   slug,
+			normalized: normalized,
+		})
+	}
+	return cache
+}
+
+func (j *DailyIPOUpdateJob) findMatchingGrowwSlug(chittorgarhSlug string, cache []growwSlugCache) string {
+	chittNormalized := j.MatcherService.NormalizeSlugForMatching(chittorgarhSlug)
+
+	for _, cached := range cache {
+		if cached.normalized == chittNormalized {
+			return cached.original
+		}
+	}
+
+	for _, cached := range cache {
+		matchResult := j.MatcherService.MatchBySlug(chittorgarhSlug, cached.original)
+		if matchResult.IsMatch && matchResult.Confidence >= 85.0 {
+			return cached.original
+		}
+	}
+
+	return ""
 }
