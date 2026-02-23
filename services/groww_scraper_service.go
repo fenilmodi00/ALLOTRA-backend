@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -27,27 +28,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	// growwDetailsBaseURL is the primary IPO data API discovered from network inspection.
+var (
 	growwDetailsBaseURL = "https://groww.in/v1/api/stocks_primary_market_data/v1/ipo/company/%s?isHniEnabled=true"
-
-	// growwCMSBaseURL is the CMS content API (objectives, registrar, lead manager).
-	growwCMSBaseURL = "https://cmsapi.groww.in/api/v1/ipo-product-content/%s"
-
-	// growwDashboardURL is the main IPO listing page used for slug discovery.
-	growwDashboardURL = "https://groww.in/ipo"
-
-	// growwIPOPathPrefix is the URL path prefix that all IPO detail links share.
-	growwIPOPathPrefix = "/ipo/"
-
-	// growwHTTPTimeout is the per-request timeout for Groww API calls.
-	growwHTTPTimeout = 30 * time.Second
-
-	// growwMaxWorkers is the concurrency ceiling for bulk scraping.
-	growwMaxWorkers = 5
-
-	// growwDataSource is the source label stored with every scraped result.
-	growwDataSource = "groww.in"
+	growwCMSBaseURL     = "https://cmsapi.groww.in/api/v1/ipo-product-content/%s"
+	growwDashboardURL   = "https://groww.in/ipo"
+	growwIPOPathPrefix  = "/ipo/"
+	growwHTTPTimeout    = 30 * time.Second
+	growwMaxWorkers     = 5
+	growwDataSource     = "groww.in"
 )
 
 // GrowwScraperService scrapes IPO data from Groww's internal JSON APIs.
@@ -73,6 +61,19 @@ func NewGrowwScraperService() *GrowwScraperService {
 		circuitBreaker: cb,
 		retryConfig:    shared.DefaultRetryConfig(),
 		logger:         logrus.StandardLogger(),
+	}
+}
+
+// NewGrowwScraperServiceWithClient constructs a GrowwScraperService with a custom HTTP client.
+// This is primarily useful for testing with mock HTTP servers.
+func NewGrowwScraperServiceWithClient(client *http.Client, logger *logrus.Logger) *GrowwScraperService {
+	cb := shared.NewCircuitBreaker("groww-scraper", shared.DefaultCircuitBreakerConfig())
+
+	return &GrowwScraperService{
+		httpClient:     client,
+		circuitBreaker: cb,
+		retryConfig:    shared.DefaultRetryConfig(),
+		logger:         logger,
 	}
 }
 
@@ -240,6 +241,7 @@ func (s *GrowwScraperService) DiscoverSlugs(ctx context.Context) ([]string, erro
 		"https://groww.in/ipo/open",
 		"https://groww.in/ipo/upcoming",
 		"https://groww.in/ipo/closed",
+		"https://groww.in/ipo/gmp",
 		"https://groww.in/ipo/allotment",
 	}
 
@@ -319,6 +321,8 @@ func (s *GrowwScraperService) DiscoverSlugs(ctx context.Context) ([]string, erro
 	}
 
 	wg.Wait()
+
+	sort.Strings(slugs)
 
 	s.logger.WithFields(logrus.Fields{
 		"component":   "GrowwScraperService",

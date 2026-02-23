@@ -116,11 +116,20 @@ func (j *DailyIPOUpdateJob) Run() {
 		growwData := j.GrowwScraper.ScrapeIPO(ctx, growwSlugToTry)
 		if growwData.DetailsError == "" && growwData.Details != nil {
 			ipoModel = j.GrowwMapper.MapToIPO(growwData, &item)
+
+			if growwData.CMSError != "" {
+				logrus.WithFields(logrus.Fields{
+					"slug":       growwSlugToTry,
+					"chitt_slug": chittorgarhSlug,
+					"cms_error":  growwData.CMSError,
+				}).Info("Groww details fetched; CMS missing (non-fatal)")
+			} else {
+				logrus.WithFields(logrus.Fields{
+					"slug":       growwSlugToTry,
+					"chitt_slug": chittorgarhSlug,
+				}).Info("Scraped rich data from Groww successfully (matched via Entity Resolution)")
+			}
 			growwWins++
-			logrus.WithFields(logrus.Fields{
-				"slug":       growwSlugToTry,
-				"chitt_slug": chittorgarhSlug,
-			}).Info("Scraped rich data from Groww successfully (matched via Entity Resolution)")
 		} else {
 			// 5. Fallback Source: Chittorgarh Basic JSON Metadata
 			logrus.WithFields(logrus.Fields{
