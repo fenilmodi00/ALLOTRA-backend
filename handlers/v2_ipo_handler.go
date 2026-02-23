@@ -1,12 +1,15 @@
 package handlers
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/fenilmodi00/ipo-backend/models"
 	"github.com/fenilmodi00/ipo-backend/services"
 	"github.com/fenilmodi00/ipo-backend/shared"
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 )
 
 type V2IPOHandler struct {
@@ -17,15 +20,40 @@ func NewV2IPOHandler(service *services.IPOService) *V2IPOHandler {
 	return &V2IPOHandler{Service: service}
 }
 
+func computeCategory(issueSize *string) string {
+	if issueSize == nil || *issueSize == "" {
+		return "mainboard"
+	}
+	sizeStr := strings.ReplaceAll(*issueSize, ",", "")
+	var sizeValue float64
+	_, err := fmt.Sscanf(sizeStr, "%f", &sizeValue)
+	if err != nil {
+		return "mainboard"
+	}
+	if sizeValue > 100000 {
+		sizeValue = sizeValue / 10000000
+	}
+	if sizeValue > 0 && sizeValue < 25 {
+		return "sme"
+	}
+	return "mainboard"
+}
+
+func formatDatePtr(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	d := t.Format(time.RFC3339)
+	return &d
+}
+
 func (h *V2IPOHandler) GetFeed(c *fiber.Ctx) error {
 	limit, offset := parsePagination(c, 50, 200)
+	statusFilter := c.Query("status", "all")
 
-	// Temporarily using existing GetActiveIPOsWithGMPPaginated.
-	// In a real implementation, service should return `total` count too.
-	// For now, we wrap the existing data.
-	ipos, err := h.Service.GetActiveIPOsWithGMPPaginated(c.Context(), limit, offset)
+	ipos, total, err := h.Service.GetActiveIPOsWithGMPPaginatedWithCount(c.Context(), statusFilter, limit, offset)
 	if err != nil {
-		return c.Status(500).JSON(shared.NewV2ErrorResponse("INTERNAL_ERROR", err.Error(), nil))
+		return c.Status(500).JSON(shared.NewV2ErrorResponse("INTERNAL_ERROR", "Failed to fetch IPOs", nil))
 	}
 
 	var mapped []models.V2IPOFeedItem
@@ -36,21 +64,12 @@ func (h *V2IPOHandler) GetFeed(c *fiber.Ctx) error {
 			Name:          ipo.Name,
 			LogoURL:       ipo.LogoURL,
 			Status:        ipo.Status,
+			Category:      computeCategory(ipo.IssueSize),
 			PriceBandLow:  ipo.PriceBandLow,
 			PriceBandHigh: ipo.PriceBandHigh,
-		}
-
-		if ipo.OpenDate != nil {
-			d := ipo.OpenDate.Format(time.RFC3339)
-			item.OpenDate = &d
-		}
-		if ipo.CloseDate != nil {
-			d := ipo.CloseDate.Format(time.RFC3339)
-			item.CloseDate = &d
-		}
-		if ipo.ListingDate != nil {
-			d := ipo.ListingDate.Format(time.RFC3339)
-			item.ListingDate = &d
+			OpenDate:      formatDatePtr(ipo.OpenDate),
+			CloseDate:     formatDatePtr(ipo.CloseDate),
+			ListingDate:   formatDatePtr(ipo.ListingDate),
 		}
 
 		if ipo.GMPValue != nil {
@@ -64,20 +83,31 @@ func (h *V2IPOHandler) GetFeed(c *fiber.Ctx) error {
 		mapped = append(mapped, item)
 	}
 
-	// TODO: service does not return total count yet; hardcoded for schema compliance.
-	// A separate PR will update the service to return (items, total, err).
-	return c.JSON(shared.NewV2PaginatedResponse(mapped, 1000, limit, offset))
+	return c.JSON(shared.NewV2PaginatedResponse(mapped, total, limit, offset))
 }
 
 func (h *V2IPOHandler) GetByID(c *fiber.Ctx) error {
 	id := c.Params("id")
+
+	// Validate UUID format
+	if _, err := uuid.Parse(id); err != nil {
+		return c.Status(400).JSON(shared.NewV2ErrorResponse("VALIDATION_ERROR", "Invalid IPO ID format", map[string]string{"field": "id", "expected": "valid UUID"}))
+	}
+
 	ipo, err := h.Service.GetIPOByIDWithGMP(c.Context(), id)
 
 	if err != nil {
-		return c.Status(500).JSON(shared.NewV2ErrorResponse("INTERNAL_ERROR", err.Error(), nil))
+		return c.Status(500).JSON(shared.NewV2ErrorResponse("INTERNAL_ERROR", "Failed to fetch IPO", nil))
 	}
 	if ipo == nil {
 		return c.Status(404).JSON(shared.NewV2ErrorResponse("NOT_FOUND", "IPO not found", nil))
+	}
+
+	// Calculate min investment
+	var minInvestment *float64
+	if ipo.MinAmount != nil {
+		m := float64(*ipo.MinAmount)
+		minInvestment = &m
 	}
 
 	detail := models.V2IPODetail{
@@ -87,31 +117,24 @@ func (h *V2IPOHandler) GetByID(c *fiber.Ctx) error {
 			Name:          ipo.Name,
 			LogoURL:       ipo.LogoURL,
 			Status:        ipo.Status,
+			Category:      computeCategory(ipo.IssueSize),
 			PriceBandLow:  ipo.PriceBandLow,
 			PriceBandHigh: ipo.PriceBandHigh,
+			OpenDate:      formatDatePtr(ipo.OpenDate),
+			CloseDate:     formatDatePtr(ipo.CloseDate),
+			ListingDate:   formatDatePtr(ipo.ListingDate),
 		},
 		Description:        ipo.Description,
 		Registrar:          ipo.Registrar,
 		IssueSize:          ipo.IssueSize,
 		MinQty:             ipo.MinQty,
 		MinAmount:          ipo.MinAmount,
+		MinInvestment:      minInvestment,
 		SubscriptionStatus: ipo.SubscriptionStatus,
 		Financials:         ipo.Financials,
 		Categories:         ipo.Categories,
 		FAQs:               ipo.FAQs,
-	}
-
-	if ipo.OpenDate != nil {
-		d := ipo.OpenDate.Format(time.RFC3339)
-		detail.OpenDate = &d
-	}
-	if ipo.CloseDate != nil {
-		d := ipo.CloseDate.Format(time.RFC3339)
-		detail.CloseDate = &d
-	}
-	if ipo.ListingDate != nil {
-		d := ipo.ListingDate.Format(time.RFC3339)
-		detail.ListingDate = &d
+		AllotmentDate:      formatDatePtr(ipo.ResultDate),
 	}
 
 	if ipo.GMPValue != nil {

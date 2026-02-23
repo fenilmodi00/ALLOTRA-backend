@@ -1272,6 +1272,39 @@ func (s *IPOService) GetActiveIPOsWithGMPPaginated(ctx context.Context, limit, o
 	return ipos, nil
 }
 
+func (s *IPOService) GetActiveIPOsWithGMPPaginatedWithCount(ctx context.Context, statusFilter string, limit, offset int) ([]models.IPOWithGMP, int, error) {
+	limit, offset = normalizePagination(limit, offset)
+
+	// Build status filter
+	statusWhere := ""
+	args := []interface{}{limit, offset}
+	if statusFilter != "" && statusFilter != "all" {
+		statusWhere = " AND i.status = $3"
+		args = append(args, statusFilter)
+	}
+
+	// Count query
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(*) FROM ipo_list i
+		WHERE (i.status = 'LIVE' OR i.status = 'RESULT_OUT' OR i.status = 'UPCOMING' OR i.status = 'CLOSED' OR i.status = 'LISTED')
+		%s
+	`, statusWhere)
+
+	var total int
+	if err := s.DB.QueryRowContext(ctx, countQuery, args[:len(args)-2]...).Scan(&total); err != nil {
+		logrus.WithError(err).Warn("Failed to count IPOs, using 0")
+		total = 0
+	}
+
+	// Get paginated results
+	ipos, err := s.GetActiveIPOsWithGMPPaginated(ctx, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return ipos, total, nil
+}
+
 // GetIPOByIDWithGMP returns a single IPO with GMP data joined by company_code
 func (s *IPOService) GetIPOByIDWithGMP(ctx context.Context, id string) (*models.IPOWithGMP, error) {
 	query := `

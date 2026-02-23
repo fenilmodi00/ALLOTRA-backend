@@ -122,7 +122,7 @@ func Run(cfg *config.Config) error {
 
 	app := fiber.New(fiber.Config{BodyLimit: 4 * 1024 * 1024})
 	registerMiddleware(app)
-	registerRoutes(app, db, cfg, ipoHandler, cacheHandler, adminHandler, checkHandler, marketHandler, gmpHandler, gmpHistoryHandler, performanceHandler, ipoService)
+	registerRoutes(app, db, cfg, ipoHandler, cacheHandler, adminHandler, checkHandler, marketHandler, gmpHandler, gmpHistoryHandler, performanceHandler, ipoService, allotmentChecker, cacheService)
 
 	serverErrors := make(chan error, 1)
 	go func() {
@@ -190,6 +190,8 @@ func registerRoutes(
 	gmpHistoryHandler *handlers.GMPHistoryHandler,
 	performanceHandler *handlers.PerformanceHandler,
 	ipoService *services.IPOService,
+	allotmentChecker *services.AllotmentChecker,
+	cacheService *services.CacheService,
 ) {
 	app.Get("/health", func(c *fiber.Ctx) error {
 		pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -264,11 +266,13 @@ func registerRoutes(
 	v2IpoHandler := handlers.NewV2IPOHandler(ipoService)
 	v2GmpHistoryHandler := handlers.NewV2GMPHistoryHandler(gmpHistoryHandler)
 	v2AdminHandler := handlers.NewV2AdminHandler(adminHandler)
+	v2AllotmentHandler := handlers.NewV2AllotmentHandler(ipoService, services.NewAllotmentChecker(), cacheService)
 
 	// V2 Public API Group (root level /api/v2)
 	v2 := app.Group("/api/v2")
 	v2.Get("/ipos/feed", v2IpoHandler.GetFeed)
 	v2.Get("/ipos/:id", v2IpoHandler.GetByID)
+	v2.Post("/allotment/check", v2AllotmentHandler.CheckAllotment)
 
 	// V2 GMP History
 	v2.Get("/gmp/history/:ipo_id/chart", v2GmpHistoryHandler.GetChartData)

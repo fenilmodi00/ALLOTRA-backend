@@ -15,6 +15,7 @@ type V2IPOFeedItem struct {
 	Name          string       `json:"name"`
 	LogoURL       *string      `json:"logo_url"`
 	Status        string       `json:"status"`
+	Category      string       `json:"category"`
 	PriceBandLow  *float64     `json:"price_band_low"`
 	PriceBandHigh *float64     `json:"price_band_high"`
 	OpenDate      *string      `json:"open_date"`
@@ -34,4 +35,6 @@ type V2IPODetail struct {
 	Financials         json.RawMessage `json:"financials,omitempty"`
 	Categories         json.RawMessage `json:"categories,omitempty"`
 	FAQs               json.RawMessage `json:"faqs,omitempty"`
+	AllotmentDate      *string         `json:"allotment_date,omitempty"`
+	MinInvestment      *float64        `json:"min_investment,omitempty"`
 }
