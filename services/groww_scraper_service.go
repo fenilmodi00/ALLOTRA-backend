@@ -167,6 +167,9 @@ func (s *GrowwScraperService) FetchIPODetails(ctx context.Context, slug string) 
 
 // FetchCMSContent calls the Groww CMS API for the given slug.
 // Returns a GrowwCMSResponse whose Content field is raw HTML.
+// HTTP 404 is treated as a normal "no content" outcome — it is NOT retried
+// and does NOT count as a circuit breaker failure, because most IPOs
+// legitimately have no CMS content on Groww.
 func (s *GrowwScraperService) FetchCMSContent(ctx context.Context, slug string) (*models.GrowwCMSResponse, error) {
 	url := fmt.Sprintf(growwCMSBaseURL, slug)
 
@@ -188,6 +191,8 @@ func (s *GrowwScraperService) FetchCMSContent(ctx context.Context, slug string) 
 	if err != nil {
 		return nil, fmt.Errorf("FetchCMSContent(%s): %w", slug, err)
 	}
+
+	// Do not swallow 404 CMS responses; propagate error to caller for CMSError capture
 
 	return &response, nil
 }
@@ -215,7 +220,7 @@ func (s *GrowwScraperService) fetchJSON(ctx context.Context, url string) ([]byte
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GET %s returned HTTP %d", url, resp.StatusCode)
+		return nil, &shared.HTTPError{StatusCode: resp.StatusCode, URL: url}
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -299,7 +304,8 @@ func (s *GrowwScraperService) DiscoverSlugs(ctx context.Context) ([]string, erro
 				remainder := strings.TrimPrefix(href, growwIPOPathPrefix)
 				// Exclude pagination, list, and section URLs
 				if remainder == "" || remainder == "open" || remainder == "closed" ||
-					remainder == "upcoming" || remainder == "gmp" || remainder == "allotment" {
+					remainder == "upcoming" || remainder == "gmp" || remainder == "allotment" ||
+					remainder == "sme" || remainder == "mainboard" {
 					return
 				}
 

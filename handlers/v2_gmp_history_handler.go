@@ -15,9 +15,15 @@ func NewV2GMPHistoryHandler(h *GMPHistoryHandler) *V2GMPHistoryHandler {
 
 // GetChartData wraps the v1 chart logic in a v2 response envelope
 func (h *V2GMPHistoryHandler) GetChartData(c *fiber.Ctx) error {
-	ipoID := c.Params("ipo_id")
-	if ipoID == "" {
+	identifier := c.Params("ipo_id")
+	if identifier == "" {
 		return c.Status(400).JSON(shared.NewV2ErrorResponse("BAD_REQUEST", "IPO ID is required", nil))
+	}
+
+	// Resolve identifier to IPO ID (UUID)
+	ipoID, err := h.LegacyHandler.Service.ResolveIPOIdentifier(identifier)
+	if err != nil {
+		return c.Status(400).JSON(shared.NewV2ErrorResponse("BAD_REQUEST", "Invalid IPO identifier", nil))
 	}
 
 	chartData, err := h.LegacyHandler.Service.GetPriceHistoryByIPO(ipoID, nil)

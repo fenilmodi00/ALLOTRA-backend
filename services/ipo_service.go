@@ -1131,10 +1131,10 @@ func (s *IPOService) UpsertIPO(ctx context.Context, item models.IPO) error {
 // Matching priority: ipo_id, then stock_id, then company_code.
 // IPO rows are always returned even when GMP data is missing.
 func (s *IPOService) GetActiveIPOsWithGMP(ctx context.Context) ([]models.IPOWithGMP, error) {
-	return s.GetActiveIPOsWithGMPPaginated(ctx, 50, 0)
+	return s.GetActiveIPOsWithGMPPaginated(ctx, "", 50, 0)
 }
 
-func (s *IPOService) GetActiveIPOsWithGMPPaginated(ctx context.Context, limit, offset int) ([]models.IPOWithGMP, error) {
+func (s *IPOService) GetActiveIPOsWithGMPPaginated(ctx context.Context, statusFilter string, limit, offset int) ([]models.IPOWithGMP, error) {
 	limit, offset = normalizePagination(limit, offset)
 
 	joinCondition := `(
@@ -1172,6 +1172,14 @@ func (s *IPOService) GetActiveIPOsWithGMPPaginated(ctx context.Context, limit, o
 		`
 	}
 
+	// Build optional status filter clause
+	statusWhere := ""
+	args := []interface{}{limit, offset}
+	if statusFilter != "" && statusFilter != "all" {
+		statusWhere = " WHERE i.status = $3"
+		args = append(args, statusFilter)
+	}
+
 	query := fmt.Sprintf(`
 		SELECT
 			i.id, i.name, i.company_code, i.description, i.price_band_low, i.price_band_high,
@@ -1195,6 +1203,7 @@ func (s *IPOService) GetActiveIPOsWithGMPPaginated(ctx context.Context, limit, o
 				g.last_updated DESC
 			LIMIT 1
 		) g ON TRUE
+		%s
 		ORDER BY
 			CASE
 				WHEN CURRENT_TIMESTAMP BETWEEN COALESCE(i.open_date, '1900-01-01') AND COALESCE(i.close_date, '2100-01-01') THEN 1
@@ -1205,9 +1214,9 @@ func (s *IPOService) GetActiveIPOsWithGMPPaginated(ctx context.Context, limit, o
 			g.last_updated DESC NULLS LAST,
 			i.created_at DESC
 		LIMIT $1 OFFSET $2
-	`, joinCondition, priorityOrder)
+	`, joinCondition, priorityOrder, statusWhere)
 
-	rows, err := s.DB.QueryContext(ctx, query, limit, offset)
+	rows, err := s.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		if isUndefinedTableError(err) {
 			logrus.WithError(err).Warn("Core IPO tables are missing; returning empty active IPO list with GMP")
@@ -1296,8 +1305,8 @@ func (s *IPOService) GetActiveIPOsWithGMPPaginatedWithCount(ctx context.Context,
 		total = 0
 	}
 
-	// Get paginated results
-	ipos, err := s.GetActiveIPOsWithGMPPaginated(ctx, limit, offset)
+	// Get paginated results — pass statusFilter so the data query matches the count query
+	ipos, err := s.GetActiveIPOsWithGMPPaginated(ctx, statusFilter, limit, offset)
 	if err != nil {
 		return nil, 0, err
 	}

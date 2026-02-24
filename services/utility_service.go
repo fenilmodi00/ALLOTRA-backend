@@ -777,13 +777,17 @@ func (s *UtilityService) cleanCellText(text string) string {
 	return strings.TrimSpace(text)
 }
 
-// CalculateIPOStatus calculates the current status of an IPO based on its dates
+// CalculateIPOStatus calculates the current status of an IPO based on its dates.
+// An optional existingStatus can be provided as a fallback when dates are
+// insufficient to determine status (e.g. Groww-only IPOs with no dates yet).
 // Returns status based on current time relative to IPO timeline:
 // - Before open date: "UPCOMING"
 // - Between open and close date: "ACTIVE"
 // - After close date: "CLOSED"
 // - After listing date: "LISTED"
-func (s *UtilityService) CalculateIPOStatus(openDate, closeDate, listingDate *time.Time) string {
+// - No dates + existingStatus provided: existingStatus
+// - No dates + no fallback: "UNKNOWN"
+func (s *UtilityService) CalculateIPOStatus(openDate, closeDate, listingDate *time.Time, existingStatus ...string) string {
 	now := time.Now()
 
 	// If we have a listing date and it's passed, IPO is listed
@@ -791,12 +795,13 @@ func (s *UtilityService) CalculateIPOStatus(openDate, closeDate, listingDate *ti
 		return "LISTED"
 	}
 
-	// If we have a close date and it's passed, IPO is closed
-	if closeDate != nil && now.After(*closeDate) {
+	// If we have a close date and it's passed (adding 24 hours since IPOs typically close at 4-5 PM
+	// on the close date, we consider it CLOSED only on the next day).
+	if closeDate != nil && now.After(closeDate.Add(24*time.Hour)) {
 		return models.StatusClosed
 	}
 
-	// If we have an open date and it's passed but close date hasn't, IPO is active
+	// If we have an open date and it's passed but close date hasn't (plus 24h), IPO is active
 	if openDate != nil && now.After(*openDate) {
 		return "ACTIVE"
 	}
@@ -806,7 +811,11 @@ func (s *UtilityService) CalculateIPOStatus(openDate, closeDate, listingDate *ti
 		return models.StatusUpcoming
 	}
 
-	// If we don't have enough date information, return unknown
+	// Dates are insufficient — use existing status as fallback if provided
+	if len(existingStatus) > 0 && existingStatus[0] != "" {
+		return existingStatus[0]
+	}
+
 	return "UNKNOWN"
 }
 

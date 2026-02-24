@@ -41,7 +41,8 @@ func computeCategory(issueSize *string) string {
 
 func formatDatePtr(t *time.Time) *string {
 	if t == nil {
-		return nil
+		tba := "TBA"
+		return &tba
 	}
 	d := t.Format(time.RFC3339)
 	return &d

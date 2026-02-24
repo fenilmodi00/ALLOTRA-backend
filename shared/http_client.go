@@ -9,6 +9,27 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// HTTPError represents an HTTP response with a non-success status code.
+// It allows callers to distinguish permanent failures (e.g. 404) from transient
+// errors that warrant retries.
+type HTTPError struct {
+	StatusCode int
+	URL        string
+}
+
+func (e *HTTPError) Error() string {
+	return fmt.Sprintf("HTTP %d from %s", e.StatusCode, e.URL)
+}
+
+// IsHTTPNotFound returns true if err is an HTTPError with status 404.
+func IsHTTPNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	httpErr, ok := err.(*HTTPError)
+	return ok && httpErr.StatusCode == http.StatusNotFound
+}
+
 // HTTPClientFactory creates optimized HTTP clients with standardized configuration
 type HTTPClientFactory struct {
 	defaultTimeout time.Duration

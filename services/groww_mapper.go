@@ -91,7 +91,12 @@ func (m *GrowwMapper) MapToIPO(growwData *models.GrowwScrapedIPO, chittItem *Chi
 		}
 
 		ipo.CompanyCode = m.utilityService.GenerateCompanyCode(d.CompanyName)
-		ipo.Status = m.utilityService.CalculateIPOStatus(ipo.OpenDate, ipo.CloseDate, ipo.ListingDate)
+
+		// Map Groww's native status as fallback for when dates are missing
+		// (e.g. Flipkart, Zepto, PhonePe which have no dates yet).
+		// Groww uses "UPCOMING", "ACTIVE", "LISTED" — map to our status constants.
+		growwFallback := mapGrowwStatus(d.Status)
+		ipo.Status = m.utilityService.CalculateIPOStatus(ipo.OpenDate, ipo.CloseDate, ipo.ListingDate, growwFallback)
 	}
 
 	if growwData.CMS != nil && growwData.CMS.Content != "" {
@@ -101,4 +106,19 @@ func (m *GrowwMapper) MapToIPO(growwData *models.GrowwScrapedIPO, chittItem *Chi
 	}
 
 	return ipo
+}
+
+// mapGrowwStatus maps Groww's native status strings to our internal status
+// constants. Groww uses "UPCOMING", "ACTIVE", "LISTED" etc. in the details API.
+func mapGrowwStatus(growwStatus string) string {
+	switch growwStatus {
+	case "UPCOMING":
+		return models.StatusUpcoming
+	case "ACTIVE":
+		return models.StatusLive
+	case "LISTED":
+		return models.StatusListed
+	default:
+		return ""
+	}
 }

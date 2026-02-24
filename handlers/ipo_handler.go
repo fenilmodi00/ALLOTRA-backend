@@ -91,7 +91,7 @@ func (h *IPOHandler) GetIPOByID(c *fiber.Ctx) error {
 // GetActiveIPOsWithGMP returns active IPOs with GMP data joined by company_code
 func (h *IPOHandler) GetActiveIPOsWithGMP(c *fiber.Ctx) error {
 	limit, offset := parsePagination(c, 50, 200)
-	ipos, err := h.Service.GetActiveIPOsWithGMPPaginated(c.Context(), limit, offset)
+	ipos, err := h.Service.GetActiveIPOsWithGMPPaginated(c.Context(), "", limit, offset)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"success": false,
