@@ -16,12 +16,7 @@ type GMPHistoryUpdateJob struct {
 	DB                *sql.DB
 	GMPHistoryService *services.GMPHistoryService
 	logger            *logrus.Logger
-	ExecutionInterval time.Duration
-	ticker            *time.Ticker
-	stopChan          chan bool
 	stateMu           sync.RWMutex
-	runMu             sync.Mutex
-	isRunning         bool
 	failedIPOs        []FailedIPO // Track failed IPOs for retry scheduling
 	lastRunMetrics    *JobMetrics // Store metrics from last run
 }
@@ -57,7 +52,6 @@ type JobMetrics struct {
 }
 
 // NewGMPHistoryUpdateJob creates a new GMP history update job instance
-// Default execution interval is 4 hours as per Requirement 4.1
 func NewGMPHistoryUpdateJob(db *sql.DB) *GMPHistoryUpdateJob {
 	service := services.NewGMPHistoryService(db)
 	return NewGMPHistoryUpdateJobWithService(db, service)
@@ -75,98 +69,19 @@ func NewGMPHistoryUpdateJobWithService(db *sql.DB, service *services.GMPHistoryS
 		DB:                db,
 		GMPHistoryService: service,
 		logger:            logger,
-		ExecutionInterval: 4 * time.Hour, // Requirement 4.1: Run every 4 hours
-		stopChan:          make(chan bool),
 		failedIPOs:        make([]FailedIPO, 0),
 		lastRunMetrics:    nil,
 	}
-}
-
-// NewGMPHistoryUpdateJobWithInterval creates a job with a custom execution interval
-// Useful for testing or custom deployment configurations
-func NewGMPHistoryUpdateJobWithInterval(db *sql.DB, interval time.Duration) *GMPHistoryUpdateJob {
-	service := services.NewGMPHistoryService(db)
-	logger := logrus.New()
-
-	return &GMPHistoryUpdateJob{
-		DB:                db,
-		GMPHistoryService: service,
-		logger:            logger,
-		ExecutionInterval: interval,
-		stopChan:          make(chan bool),
-		failedIPOs:        make([]FailedIPO, 0),
-		lastRunMetrics:    nil,
-	}
-}
-
-// Start begins the background job with scheduled execution
-// The job runs immediately on start, then repeats at the configured interval
-func (j *GMPHistoryUpdateJob) Start() {
-	logrus.WithField("interval", j.ExecutionInterval.String()).Info("Starting GMP History Update Job...")
-
-	j.ticker = time.NewTicker(j.ExecutionInterval)
-
-	go func() {
-		// Run immediately on start
-		j.Run()
-
-		// Then run on schedule
-		for {
-			select {
-			case <-j.ticker.C:
-				j.Run()
-			case <-j.stopChan:
-				logrus.Info("GMP History Update Job stopped")
-				return
-			}
-		}
-	}()
-}
-
-// Stop gracefully stops the background job
-func (j *GMPHistoryUpdateJob) Stop() {
-	if j.ticker != nil {
-		j.ticker.Stop()
-	}
-
-	// Signal the goroutine to stop
-	select {
-	case j.stopChan <- true:
-	default:
-		// Channel already closed or stop already sent
-	}
-
-	// Close the service and its background workers
-	if j.GMPHistoryService != nil {
-		j.GMPHistoryService.Close()
-	}
-
-	logrus.Info("GMP History Update Job shutdown complete")
 }
 
 // Run executes a single iteration of the job
 // Implements Requirements 4.1, 4.2, 4.4, 4.5, 6.3:
-// - 4.1: Scheduled execution every 4 hours
+// - 4.1: Scheduled execution via external cron
 // - 4.2: Prioritizes active IPOs over closed ones
 // - 4.4: Processing metrics collection and reporting
 // - 4.5: Comprehensive error logging and job status tracking
 // - 6.3: Failure recovery and retry scheduling logic
 func (j *GMPHistoryUpdateJob) Run() {
-	j.runMu.Lock()
-	if j.isRunning {
-		j.runMu.Unlock()
-		logrus.Warn("Skipping GMP History Update Job run; previous run still active")
-		return
-	}
-	j.isRunning = true
-	j.runMu.Unlock()
-
-	defer func() {
-		j.runMu.Lock()
-		j.isRunning = false
-		j.runMu.Unlock()
-	}()
-
 	startTime := time.Now()
 
 	logrus.WithFields(logrus.Fields{
@@ -289,7 +204,6 @@ func (j *GMPHistoryUpdateJob) Run() {
 		"queue_size_before":       metrics.QueueSizeBefore,
 		"queue_size_after":        metrics.QueueSizeAfter,
 		"queue_items_processed":   metrics.QueueItemsProcessed,
-		"next_run":                time.Now().Add(j.ExecutionInterval).Format(time.RFC3339),
 	}
 
 	// Add resilience queue metrics if available
@@ -317,249 +231,4 @@ func (j *GMPHistoryUpdateJob) Run() {
 
 // retryFailedIPOs attempts to reprocess IPOs that failed in previous runs
 // Implements Requirement 6.3 - Failure recovery and retry scheduling
-func (j *GMPHistoryUpdateJob) retryFailedIPOs(metrics *JobMetrics) {
-	retryStartTime := time.Now()
-	retriedIPOs := make([]FailedIPO, 0)
-	stillFailedIPOs := make([]FailedIPO, 0)
-
-	j.stateMu.RLock()
-	failedSnapshot := make([]FailedIPO, len(j.failedIPOs))
-	copy(failedSnapshot, j.failedIPOs)
-	j.stateMu.RUnlock()
-
-	logrus.WithField("retry_count", len(failedSnapshot)).Info("Starting retry of failed IPOs")
-
-	for _, failedIPO := range failedSnapshot {
-		// Skip if retry count exceeds maximum (3 retries)
-		if failedIPO.RetryCount >= 3 {
-			logrus.WithFields(logrus.Fields{
-				"ipo_id":       failedIPO.IPOID,
-				"ipo_name":     failedIPO.IPOName,
-				"retry_count":  failedIPO.RetryCount,
-				"last_failure": failedIPO.FailureReason,
-			}).Warn("IPO exceeded maximum retry count, skipping")
-			continue
-		}
-
-		logrus.WithFields(logrus.Fields{
-			"ipo_id":       failedIPO.IPOID,
-			"company_code": failedIPO.CompanyCode,
-			"retry_count":  failedIPO.RetryCount + 1,
-		}).Info("Retrying failed IPO")
-
-		// Attempt to scrape and save
-		collection, err := j.GMPHistoryService.ScrapeIPOPriceHistoryWithName(failedIPO.IPOID, failedIPO.CompanyCode, failedIPO.IPOName)
-		if err != nil {
-			// Still failing, increment retry count and keep in failed list
-			failedIPO.RetryCount++
-			failedIPO.FailureTime = time.Now()
-			failedIPO.FailureReason = err.Error()
-			stillFailedIPOs = append(stillFailedIPOs, failedIPO)
-
-			metrics.FailedIPOs++
-			metrics.ErrorSummary = append(metrics.ErrorSummary,
-				fmt.Sprintf("Retry failed for %s: %v", failedIPO.IPOName, err))
-
-			j.logger.WithFields(logrus.Fields{
-				"ipo_id":       failedIPO.IPOID,
-				"ipo_name":     failedIPO.IPOName,
-				"company_code": failedIPO.CompanyCode,
-				"retry_count":  failedIPO.RetryCount,
-			}).Error("Retry failed for IPO: ", err.Error())
-			continue
-		}
-
-		// Save to database
-		err = j.GMPHistoryService.SavePriceHistory(collection)
-		if err != nil {
-			// Save failed, keep in failed list
-			failedIPO.RetryCount++
-			failedIPO.FailureTime = time.Now()
-			failedIPO.FailureReason = err.Error()
-			stillFailedIPOs = append(stillFailedIPOs, failedIPO)
-
-			metrics.FailedIPOs++
-			metrics.ErrorSummary = append(metrics.ErrorSummary,
-				fmt.Sprintf("Retry save failed for %s: %v", failedIPO.IPOName, err))
-
-			logrus.WithFields(logrus.Fields{
-				"ipo_id": failedIPO.IPOID,
-				"error":  err.Error(),
-			}).Error("Retry save failed for IPO")
-			continue
-		}
-
-		// Success! Remove from failed list
-		retriedIPOs = append(retriedIPOs, failedIPO)
-		metrics.SuccessfulIPOs++
-		metrics.TotalRecordsAdded += collection.TotalRecords
-
-		logrus.WithFields(logrus.Fields{
-			"ipo_id":        failedIPO.IPOID,
-			"records_added": collection.TotalRecords,
-			"retry_count":   failedIPO.RetryCount + 1,
-		}).Info("Successfully retried failed IPO")
-	}
-
-	// Update failed IPOs list
-	j.stateMu.Lock()
-	j.failedIPOs = stillFailedIPOs
-	remaining := len(j.failedIPOs)
-	j.stateMu.Unlock()
-
-	retryDuration := time.Since(retryStartTime)
-
-	logrus.WithFields(logrus.Fields{
-		"total_retried":    len(retriedIPOs) + len(stillFailedIPOs),
-		"successful":       len(retriedIPOs),
-		"still_failed":     len(stillFailedIPOs),
-		"retry_duration":   retryDuration.String(),
-		"pending_for_next": remaining,
-	}).Info("Completed retry of failed IPOs")
-}
-
-// logOperationalWarnings logs warnings for operational issues
-// Implements Requirement 4.5 - Comprehensive error logging
-func (j *GMPHistoryUpdateJob) logOperationalWarnings(metrics *JobMetrics) {
-	// Log warning if queue size increased (indicates database issues)
-	if metrics.QueueSizeAfter > metrics.QueueSizeBefore {
-		logrus.WithFields(logrus.Fields{
-			"queue_size_increase": metrics.QueueSizeAfter - metrics.QueueSizeBefore,
-			"queue_size_before":   metrics.QueueSizeBefore,
-			"queue_size_after":    metrics.QueueSizeAfter,
-		}).Warn("Resilience queue size increased - possible database connectivity issues")
-	}
-
-	// Log success if queue was drained
-	if metrics.QueueSizeBefore > 0 && metrics.QueueSizeAfter == 0 {
-		logrus.WithField("items_processed", metrics.QueueSizeBefore).Info("Resilience queue successfully drained")
-	}
-
-	// Log warning if success rate is low
-	if metrics.SuccessRate < 80.0 && metrics.TotalIPOs > 0 {
-		logrus.WithFields(logrus.Fields{
-			"success_rate":    fmt.Sprintf("%.2f%%", metrics.SuccessRate),
-			"failed_ipos":     metrics.FailedIPOs,
-			"successful_ipos": metrics.SuccessfulIPOs,
-		}).Warn("Low success rate detected - check error logs for details")
-	}
-
-	// Log warning if no records were added
-	if metrics.TotalRecordsAdded == 0 && metrics.TotalIPOs > 0 {
-		logrus.WithField("ipos_processed", metrics.TotalIPOs).Warn("No records added despite processing IPOs - possible data source issues")
-	}
-
-	// Log warning if job took too long
-	if metrics.Duration > 30*time.Minute {
-		logrus.WithFields(logrus.Fields{
-			"duration":   metrics.Duration.String(),
-			"ipos_count": metrics.TotalIPOs,
-		}).Warn("Job execution took longer than expected - consider optimization")
-	}
-}
-
-// GetNextRunTime returns the scheduled time for the next job execution
-func (j *GMPHistoryUpdateJob) GetNextRunTime() time.Time {
-	return time.Now().Add(j.ExecutionInterval)
-}
-
-// GetExecutionInterval returns the configured execution interval
-func (j *GMPHistoryUpdateJob) GetExecutionInterval() time.Duration {
-	return j.ExecutionInterval
-}
-
-// SetExecutionInterval updates the execution interval
-// Note: This will take effect on the next scheduled run
-func (j *GMPHistoryUpdateJob) SetExecutionInterval(interval time.Duration) {
-	j.ExecutionInterval = interval
-
-	// If the job is already running, restart the ticker
-	if j.ticker != nil {
-		j.ticker.Stop()
-		j.ticker = time.NewTicker(interval)
-	}
-
-	logrus.WithField("new_interval", interval.String()).Info("GMP History Update Job interval updated")
-}
-
-// GetLastRunMetrics returns metrics from the last job execution
-// Implements Requirement 4.4 - Processing metrics collection and reporting
-func (j *GMPHistoryUpdateJob) GetLastRunMetrics() *JobMetrics {
-	j.stateMu.RLock()
-	defer j.stateMu.RUnlock()
-
-	if j.lastRunMetrics == nil {
-		return nil
-	}
-
-	copyMetrics := *j.lastRunMetrics
-	if len(j.lastRunMetrics.ErrorSummary) > 0 {
-		copyMetrics.ErrorSummary = append([]string(nil), j.lastRunMetrics.ErrorSummary...)
-	}
-
-	return &copyMetrics
-
-}
-
-// GetFailedIPOCount returns the number of IPOs pending retry
-// Implements Requirement 6.3 - Failure recovery tracking
-func (j *GMPHistoryUpdateJob) GetFailedIPOCount() int {
-	j.stateMu.RLock()
-	defer j.stateMu.RUnlock()
-	return len(j.failedIPOs)
-}
-
-// GetFailedIPOs returns the list of IPOs pending retry
-// Implements Requirement 6.3 - Failure recovery tracking
-func (j *GMPHistoryUpdateJob) GetFailedIPOs() []FailedIPO {
-	j.stateMu.RLock()
-	defer j.stateMu.RUnlock()
-
-	copyFailed := make([]FailedIPO, len(j.failedIPOs))
-	copy(copyFailed, j.failedIPOs)
-	return copyFailed
-}
-
-// ClearFailedIPOs clears the list of failed IPOs
-// Useful for manual intervention or testing
-func (j *GMPHistoryUpdateJob) ClearFailedIPOs() {
-	j.stateMu.Lock()
-	j.failedIPOs = make([]FailedIPO, 0)
-	j.stateMu.Unlock()
-	logrus.Info("Cleared failed IPOs list")
-}
-
-// GetJobStatus returns a comprehensive status report of the job
-// Implements Requirement 4.4 - Processing metrics collection and reporting
-func (j *GMPHistoryUpdateJob) GetJobStatus() map[string]interface{} {
-	status := map[string]interface{}{
-		"execution_interval": j.ExecutionInterval.String(),
-		"next_run_time":      j.GetNextRunTime().Format(time.RFC3339),
-		"failed_ipo_count":   j.GetFailedIPOCount(),
-		"is_running":         j.ticker != nil,
-	}
-
-	if j.lastRunMetrics != nil {
-		status["last_run"] = map[string]interface{}{
-			"start_time":              j.lastRunMetrics.JobStartTime.Format(time.RFC3339),
-			"end_time":                j.lastRunMetrics.JobEndTime.Format(time.RFC3339),
-			"duration":                j.lastRunMetrics.Duration.String(),
-			"total_ipos":              j.lastRunMetrics.TotalIPOs,
-			"successful_ipos":         j.lastRunMetrics.SuccessfulIPOs,
-			"failed_ipos":             j.lastRunMetrics.FailedIPOs,
-			"success_rate":            fmt.Sprintf("%.2f%%", j.lastRunMetrics.SuccessRate),
-			"total_records_added":     j.lastRunMetrics.TotalRecordsAdded,
-			"avg_records_per_ipo":     fmt.Sprintf("%.2f", j.lastRunMetrics.AvgRecordsPerIPO),
-			"avg_processing_time_ipo": j.lastRunMetrics.AvgProcessingTimeIPO.String(),
-			"queue_size_before":       j.lastRunMetrics.QueueSizeBefore,
-			"queue_size_after":        j.lastRunMetrics.QueueSizeAfter,
-			"queue_items_processed":   j.lastRunMetrics.QueueItemsProcessed,
-		}
-	}
-
-	// Add resilience queue status
-	queueMetrics := j.GMPHistoryService.GetResilienceQueueMetrics()
-	status["resilience_queue"] = queueMetrics
-
-	return status
-}
+func (
