@@ -1209,7 +1209,7 @@ func (s *IPOService) GetActiveIPOsWithGMPPaginated(ctx context.Context, statusFi
 	// Build optional status filter clause
 	statusWhere := ""
 	args := []interface{}{limit, offset}
-	if statusFilter != "" && statusFilter != "all" {
+	if statusFilter != "" && strings.ToLower(statusFilter) != "all" {
 		statusWhere = " WHERE i.status = $3"
 		args = append(args, statusFilter)
 	}
@@ -1333,7 +1333,7 @@ func (s *IPOService) GetActiveIPOsWithGMPPaginatedWithCount(ctx context.Context,
 	`
 
 	var countArgs []interface{}
-	if statusFilter != "" && statusFilter != "all" {
+	if statusFilter != "" && strings.ToLower(statusFilter) != "all" {
 		countArgs = []interface{}{statusFilter}
 	} else {
 		// No filter - query without WHERE clause

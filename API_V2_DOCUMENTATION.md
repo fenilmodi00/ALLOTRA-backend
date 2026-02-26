@@ -4,9 +4,11 @@
 
 This document describes the V2 API endpoints for the IPO Backend. The V2 API provides a modern, consistent interface with standardized response envelopes, pagination metadata, and nested GMP data.
 
-**Base URL:** `https://api.example.com/api/v2`
+**Base URL:** `https://api.example.com` (or `http://localhost:8080` locally)
 
-**Last Updated:** February 2026
+**Authentication:**
+*   Public endpoints: None required.
+*   Admin endpoints: Require `X-Admin-Token` header.
 
 ---
 
@@ -56,23 +58,49 @@ All V2 responses follow a consistent envelope format:
 | `INTERNAL_ERROR` | 500 | Server error |
 | `BAD_GATEWAY` | 502 | External service error |
 | `SERVICE_UNAVAILABLE` | 503 | Service temporarily unavailable |
+| `RATE_LIMITED` | 429 | Too many requests |
+
+**Note:** Some Admin endpoints currently return a legacy format:
+```json
+{
+  "success": true,
+  "data": ...
+}
+```
+(without strict envelope structure for data/meta/error code)
 
 ---
 
-## IPO Endpoints
+## Public Endpoints
 
 ### 1. Get IPO Feed
 
 **Endpoint:** `GET /api/v2/ipos/feed`
 
-**Description:** Returns a paginated list of IPOs with GMP data. Replaces the V1 endpoints `/ipos`, `/ipos/active`, and `/ipos/active-with-gmp`.
+**Description:** Returns a paginated list of IPOs with GMP data.
 
 **Query Parameters:**
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `status` | string | No | `all` | Filter by status: `all`, `live`, `upcoming`, `closed`, `listed` |
+| `status` | string | No | `all` | Filter by status: `all`, `live`, `upcoming`, `closed`, `listed`, `active` |
 | `limit` | int | No | 50 | Number of items per page (max 200) |
 | `offset` | int | No | 0 | Number of items to skip |
+
+**Example Requests:**
+- Get all active IPOs:
+  `http://localhost:8080/api/v2/ipos/feed?status=active`
+- Get all live IPOs (open for subscription):
+  `http://localhost:8080/api/v2/ipos/feed?status=live`
+- Get upcoming IPOs:
+  `http://localhost:8080/api/v2/ipos/feed?status=upcoming`
+- Get closed IPOs (subscription closed, waiting for allotment/listing):
+  `http://localhost:8080/api/v2/ipos/feed?status=closed`
+- Get listed IPOs:
+  `http://localhost:8080/api/v2/ipos/feed?status=listed`
+- Get all IPOs:
+  `http://localhost:8080/api/v2/ipos/feed?status=all`
+- Paginated results (Page 2 with 10 items per page):
+  `http://localhost:8080/api/v2/ipos/feed?status=all&limit=10&offset=10`
 
 **Response:**
 ```json
@@ -120,12 +148,15 @@ curl -X GET "https://api.example.com/api/v2/ipos/feed?status=live&limit=20" \
 
 **Endpoint:** `GET /api/v2/ipos/:id`
 
-**Description:** Returns detailed information about a specific IPO, including GMP data and Groww-sourced fields. Replaces V1 endpoints `/ipos/:id`, `/ipos/:id/with-gmp`, and `/ipos/:id/gmp`.
+**Description:** Returns detailed information about a specific IPO, including GMP data and extensive details from external sources (Groww).
 
 **Path Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `id` | UUID | Yes | IPO unique identifier |
+
+**Example Request:**
+`http://localhost:8080/api/v2/ipos/550e8400-e29b-41d4-a716-446655440000`
 
 **Response:**
 ```json
@@ -141,6 +172,7 @@ curl -X GET "https://api.example.com/api/v2/ipos/feed?status=live&limit=20" \
     "price_band_low": 100.0,
     "price_band_high": 120.0,
     "min_qty": 100,
+    "min_amount": 12000,
     "min_investment": 12000.0,
     "issue_size": "₹500 Cr",
     "registrar": "Link Intime",
@@ -150,9 +182,33 @@ curl -X GET "https://api.example.com/api/v2/ipos/feed?status=live&limit=20" \
     "listing_date": "2024-12-20T00:00:00Z",
     "description": "Company description",
     "subscription_status": "Oversubscribed 2.5x",
-    "financials": [...],
-    "categories": [...],
-    "faqs": [...],
+    "strengths": ["Strong brand", "Experienced management"],
+    "risks": ["High competition"],
+    "financials": [
+        {
+            "title": "Revenue",
+            "yearly": {"2023": 100.0, "2024": 120.0}
+        }
+    ],
+    "categories": [],
+    "faqs": [],
+    "objectives": [],
+    "lead_manager": "Axis Capital",
+    "registrar_phone": "+91-22-12345678",
+    "registrar_email": "support@linkintime.co.in",
+    "company_address": "Bangalore, India",
+    "company_phone": "+91-80-12345678",
+    "company_email": "investor@wakefit.co",
+    "cms_details": {
+        "content": "<div>HTML content...</div>",
+        "objectives": [...]
+    },
+    "groww_details": {
+        "minPrice": 100.0,
+        "maxPrice": 120.0,
+        "issueSize": 5000000000,
+        "lotSize": 100
+    },
     "gmp": {
       "value": 25.0,
       "gain_percent": 22.73,
@@ -163,10 +219,6 @@ curl -X GET "https://api.example.com/api/v2/ipos/feed?status=live&limit=20" \
 }
 ```
 
-**Error Responses:**
-- `400 VALIDATION_ERROR`: Invalid UUID format
-- `404 NOT_FOUND`: IPO not found
-
 **cURL:**
 ```bash
 curl -X GET "https://api.example.com/api/v2/ipos/550e8400-e29b-41d4-a716-446655440000" \
@@ -175,15 +227,13 @@ curl -X GET "https://api.example.com/api/v2/ipos/550e8400-e29b-41d4-a716-4466554
 
 ---
 
-## Allotment Check Endpoints
-
 ### 3. Check Allotment Status
 
 **Endpoint:** `POST /api/v2/allotment/check`
 
 **Description:** Check the allotment status of an IPO application using PAN number.
 
-**Request:**
+**Request Body:**
 ```json
 {
   "ipo_id": "550e8400-e29b-41d4-a716-446655440000",
@@ -210,18 +260,7 @@ curl -X GET "https://api.example.com/api/v2/ipos/550e8400-e29b-41d4-a716-4466554
 }
 ```
 
-**Status Values:**
-| Status | Description |
-|--------|-------------|
-| `ALLOTTED` | Shares have been allotted |
-| `NOT_ALLOTTED` | No shares were allotted |
-| `PENDING` | Allotment result pending |
-
-**Error Responses:**
-- `400 VALIDATION_ERROR`: Invalid request (missing/invalid fields)
-- `404 NOT_FOUND`: IPO not found
-- `422 VALIDATION_ERROR`: Invalid PAN format
-- `502 BAD_GATEWAY`: External service error
+**Status Values:** `ALLOTTED`, `NOT_ALLOTTED`, `PENDING`
 
 **cURL:**
 ```bash
@@ -231,8 +270,6 @@ curl -X POST "https://api.example.com/api/v2/allotment/check" \
 ```
 
 ---
-
-## GMP History Endpoints
 
 ### 4. Get GMP Chart Data
 
@@ -244,6 +281,9 @@ curl -X POST "https://api.example.com/api/v2/allotment/check" \
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `ipo_id` | string | Yes | IPO identifier (UUID or stock_id) |
+
+**Example Request:**
+`http://localhost:8080/api/v2/gmp/history/550e8400-e29b-41d4-a716-446655440000/chart`
 
 **Response:**
 ```json
@@ -271,100 +311,135 @@ curl -X GET "https://api.example.com/api/v2/gmp/history/550e8400-e29b-41d4-a716-
 
 ## Admin Endpoints
 
-All admin endpoints require authentication via `X-Admin-Token` header.
+**Authentication:** Requires `X-Admin-Token` header.
 
-### 5. Create IPO (Admin)
+### 5. Create IPO
 
 **Endpoint:** `POST /api/v2/admin/ipos`
 
-**Headers:**
-| Header | Required | Description |
-|--------|----------|-------------|
-| `X-Admin-Token` | Yes | Admin authentication token |
+**Format:** Legacy Response
 
-### 6. Trigger GMP Update (Admin)
+**Request Body:**
+```json
+{
+  "stock_id": "example-ipo",
+  "name": "Example IPO",
+  "open_date": "2024-01-01T00:00:00Z",
+  "close_date": "2024-01-03T00:00:00Z",
+  ...
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": { ... }
+}
+```
+
+### 6. Trigger GMP Update
 
 **Endpoint:** `POST /api/v2/admin/gmp/update`
 
-**Description:** Manually trigger a GMP data update.
+**Description:** Manually trigger a GMP data update job.
 
-### 7. Get GMP Data (Admin)
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "message": "GMP update job completed",
+    "duration": "1.234s"
+  }
+}
+```
+
+### 7. Get GMP Data
 
 **Endpoint:** `GET /api/v2/admin/gmp/data`
 
-**Description:** Get current GMP data from the database.
+**Format:** Legacy Response
 
-### 8. Trigger GMP History Update (Admin)
+**Description:** Get recent GMP data from the database.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [ ... ],
+  "count": 20
+}
+```
+
+### 8. Trigger GMP History Update
 
 **Endpoint:** `POST /api/v2/admin/gmp-history/update`
 
-**Description:** Manually trigger GMP history backfill.
+**Description:** Manually trigger GMP history backfill job.
 
-### 9. Get GMP History Job Status (Admin)
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "message": "GMP history update job completed",
+    "duration": "5m 30s"
+  }
+}
+```
+
+### 9. Get GMP History Job Status
 
 **Endpoint:** `GET /api/v2/admin/gmp-history/status`
 
-### 10. Get GMP History Job Metrics (Admin)
+**Description:** Get current status of the GMP history job.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "is_running": false,
+    "last_run": "2024-02-01T10:00:00Z",
+    ...
+  }
+}
+```
+
+### 10. Get GMP History Job Metrics
 
 **Endpoint:** `GET /api/v2/admin/gmp-history/metrics`
 
----
+**Description:** Get detailed metrics from the last GMP history job run.
 
-## Response Fields Reference
-
-### IPO Feed Item Fields
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | UUID | Unique identifier |
-| `stock_id` | string | Stock exchange ID |
-| `name` | string | Company name |
-| `logo_url` | string | Company logo URL |
-| `status` | string | IPO status (LIVE, UPCOMING, CLOSED, LISTED) |
-| `category` | string | IPO category (mainboard, sme) |
-| `price_band_low` | float | Lower price bound |
-| `price_band_high` | float | Upper price bound |
-| `open_date` | ISO8601 | IPO opening date |
-| `close_date` | ISO8601 | IPO closing date |
-| `listing_date` | ISO8601 | Expected listing date |
-| `gmp` | object | Grey Market Premium data (see below) |
-
-### GMP Nested Fields
-| Field | Type | Description |
-|-------|------|-------------|
-| `value` | float | GMP value |
-| `gain_percent` | float | Expected gain percentage |
-| `estimated_listing` | float | Estimated listing price |
-| `subscription_status` | string | Subscription status |
-
-### IPO Detail Additional Fields
-| Field | Type | Description |
-|-------|------|-------------|
-| `description` | string | Company description |
-| `registrar` | string | IPO registrar |
-| `issue_size` | string | Issue size |
-| `min_qty` | int | Minimum lot size |
-| `min_investment` | float | Minimum investment amount |
-| `allotment_date` | ISO8601 | Allotment result date |
-| `subscription_status` | string | Subscription status |
-| `financials` | JSON | Financial data from Groww |
-| `categories` | JSON | IPO categories from Groww |
-| `faqs` | JSON | FAQs from Groww |
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "job_start_time": "2024-02-01T10:00:00Z",
+    "duration": "5m",
+    "total_ipos": 50,
+    "successful_ipos": 48,
+    "failed_ipos": 2,
+    "error_summary": { ... }
+  }
+}
+```
 
 ---
 
-## Pagination
+## Internal / Utility Endpoints
 
-All list endpoints support pagination using `limit` and `offset` query parameters:
+These endpoints are primarily for testing and performance monitoring. They currently reside under `/api/v1` but are available for system maintenance.
 
-- **Default limit:** 50
-- **Maximum limit:** 200
-- **Offset:** Number of items to skip
-
-The response includes a `meta` object with:
-- `total`: Total number of items available
-- `limit`: Items per page
-- `offset`: Current offset
-- `has_next`: Whether more items are available
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/performance/metrics` | GET | Get cache and system performance metrics |
+| `/api/v1/performance/test` | POST | Run a performance test (heavy load simulation) |
+| `/api/v1/performance/cache` | DELETE | Clear the application cache |
+| `/api/v1/performance/cache/warmup` | POST | Manually trigger cache warmup |
 
 ---
 
@@ -391,79 +466,37 @@ When rate limited, the API returns:
 
 ---
 
-## Versioning
+## Data Models Reference
 
-This is V2 of the API. V1 endpoints remain available at `/api/v1/` for backward compatibility but are considered deprecated.
+### V2IPOFeedItem
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | UUID | Unique identifier |
+| `stock_id` | string | Stock exchange ID / Slug |
+| `name` | string | Company name |
+| `logo_url` | string | Company logo URL |
+| `status` | string | IPO status (LIVE, UPCOMING, CLOSED, LISTED) |
+| `category` | string | IPO category (mainboard, sme) |
+| `price_band_low` | float | Lower price bound |
+| `price_band_high` | float | Upper price bound |
+| `open_date` | string | IPO opening date (ISO8601) |
+| `close_date` | string | IPO closing date (ISO8601) |
+| `listing_date` | string | Expected listing date (ISO8601) |
+| `gmp` | object | Nested GMP data |
 
-**Deprecation Policy:**
-- V1 endpoints will be supported for 6 months after V2 release
-- Deprecation headers will be added to V1 responses
-- Monitor usage metrics to track migration progress
+### V2GMPNested
+| Field | Type | Description |
+|-------|------|-------------|
+| `value` | float | GMP value |
+| `gain_percent` | float | Expected gain percentage |
+| `estimated_listing` | float | Estimated listing price |
+| `subscription_status` | string | Subscription status text |
 
----
-
-## Testing
-
-### Manual Testing
-
-```bash
-# Test feed endpoint
-curl http://localhost:8080/api/v2/ipos/feed | jq
-
-# Test feed with status filter
-curl "http://localhost:8080/api/v2/ipos/feed?status=live" | jq
-
-# Test IPO detail
-curl http://localhost:8080/api/v2/ipos/550e8400-e29b-41d4-a716-446655440000 | jq
-
-# Test allotment check
-curl -X POST http://localhost:8080/api/v2/allotment/check \
-  -H "Content-Type: application/json" \
-  -d '{"ipo_id": "550e8400-e29b-41d4-a716-446655440000", "pan": "ABCDE1234F"}' | jq
-```
-
----
-
-## Migration Guide from V1 to V2
-
-### Changes in V2:
-
-1. **Response Envelope**: V2 uses standardized `{success, data, meta?}` format
-2. **Nested GMP**: GMP data is now nested under `gmp` object instead of flat fields
-3. **Pagination**: V2 includes `meta` with pagination info
-4. **Category**: New `category` field (mainboard/sme)
-5. **Groww Fields**: Detail endpoint includes `financials`, `categories`, `faqs`
-6. **Allotment**: PAN validation uses regex `^[A-Z]{5}[0-9]{4}[A-Z]$`
-
-### Example Migration:
-
-**V1 Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "...",
-    "gmp_value": 25.0,
-    "gain_percent": 22.73
-  }
-}
-```
-
-**V2 Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "...",
-    "gmp": {
-      "value": 25.0,
-      "gain_percent": 22.73
-    }
-  }
-}
-```
-
----
-
-**Document Version:** 2.0  
-**Last Updated:** February 2026
+### GrowwIPODetailsResponse (Nested in Detail)
+Key fields include:
+*   `minPrice`, `maxPrice`, `issueSize`, `lotSize`
+*   `startDate`, `endDate`, `listingDate`
+*   `subscriptionRates`: Array of category subscription rates
+*   `financials`: Revenue, Profit, Assets data
+*   `aboutCompany`: Company profile text
+*   `pros`, `cons`: Arrays of strings
