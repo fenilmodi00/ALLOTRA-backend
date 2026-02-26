@@ -33,7 +33,8 @@ func main() {
 
 	// Test 2: GMP Service
 	fmt.Print("📈 GMP Service: ")
-	gmp := services.NewSimpleGMPService(nil)
+	cfg := config.LoadConfig()
+	gmp := services.NewSimpleGMPService(nil, cfg.InvestorGainURL)
 	if gmpData, err := gmp.FetchGMPData(); err != nil {
 		fmt.Printf("❌ FAILED (%v)\n", err)
 	} else {
@@ -43,7 +44,6 @@ func main() {
 
 	// Test 3: Database
 	fmt.Print("🗄️  Database: ")
-	cfg := config.LoadConfig()
 	if err := database.Connect(cfg.DatabaseURL); err != nil {
 		fmt.Printf("❌ FAILED (%v)\n", err)
 	} else {

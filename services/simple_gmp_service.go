@@ -18,15 +18,17 @@ import (
 
 // SimpleGMPService provides a fast, efficient GMP scraping service
 type SimpleGMPService struct {
-	db     *sql.DB
-	logger *logrus.Logger
+	db         *sql.DB
+	logger     *logrus.Logger
+	scraperURL string
 }
 
 // NewSimpleGMPService creates a new simple GMP service
-func NewSimpleGMPService(db *sql.DB) *SimpleGMPService {
+func NewSimpleGMPService(db *sql.DB, scraperURL string) *SimpleGMPService {
 	return &SimpleGMPService{
-		db:     db,
-		logger: logrus.New(),
+		db:         db,
+		logger:     logrus.New(),
+		scraperURL: scraperURL,
 	}
 }
 
@@ -109,7 +111,7 @@ func (s *SimpleGMPService) scrapeInvestorGainData() ([]GMPScrapingResult, error)
 	// Navigate and extract data efficiently
 	err := chromedp.Run(ctx,
 		chromedp.EmulateViewport(1920, 1080),
-		chromedp.Navigate("https://www.investorgain.com/report/live-ipo-gmp/331/all/"),
+		chromedp.Navigate(s.scraperURL),
 
 		// Wait for table and extract data in one go
 		chromedp.WaitVisible("table tbody tr", chromedp.ByQuery),

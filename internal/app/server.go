@@ -79,7 +79,7 @@ func Run(cfg *config.Config) error {
 	dailyJob := jobs.NewDailyIPOUpdateJob(scrapingService, growwScraper, growwMapper, ipoService, utilityService)
 	resultJob := jobs.NewResultReleaseCheckJob(ipoService)
 	cleanupJob := jobs.NewCacheCleanupJob(cacheService)
-	gmpJob := jobs.NewGMPUpdateJob(db, cacheService)
+	gmpJob := jobs.NewGMPUpdateJob(db, cacheService, cfg.InvestorGainURL)
 	gmpHistoryService := services.NewGMPHistoryService(db)
 	gmpHistoryJob := jobs.NewGMPHistoryUpdateJobWithService(db, gmpHistoryService)
 
