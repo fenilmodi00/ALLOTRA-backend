@@ -26,11 +26,6 @@ func ConnectDB(dbURL string) (*sql.DB, error) {
 	return ConnectWithConfigAndReturn(dbURL, &config)
 }
 
-func ConnectWithConfig(dbURL string, config *shared.DatabaseConfig) error {
-	_, err := ConnectWithConfigAndReturn(dbURL, config)
-	return err
-}
-
 func ConnectWithConfigAndReturn(dbURL string, config *shared.DatabaseConfig) (*sql.DB, error) {
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
@@ -68,13 +63,6 @@ func Close() {
 		DB = nil
 		logrus.Info("Database connection closed")
 	}
-}
-
-func GetConnectionStats() sql.DBStats {
-	if DB == nil {
-		return sql.DBStats{}
-	}
-	return DB.Stats()
 }
 
 func HealthCheck() error {
