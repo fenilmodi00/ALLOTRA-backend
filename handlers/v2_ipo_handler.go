@@ -72,6 +72,7 @@ func (h *V2IPOHandler) GetFeed(c *fiber.Ctx) error {
 			OpenDate:      formatDatePtr(ipo.OpenDate),
 			CloseDate:     formatDatePtr(ipo.CloseDate),
 			ListingDate:   formatDatePtr(ipo.ListingDate),
+			AllotmentDate: formatDatePtr(ipo.ResultDate),
 		}
 
 		if ipo.GMPValue != nil {

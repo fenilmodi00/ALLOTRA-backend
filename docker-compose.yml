@@ -1,16 +1,20 @@
 version: '3.8'
 services:
-  db:
-    image: postgres:15-alpine
-    container_name: ipo_db
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: ipo_db
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
     ports:
-      - "5432:5432"
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgres://postgres:RsCcdtSEFyGdJMG0@db.bfirenjerddoyqsihytp.supabase.co:5432/postgres
+      - SUPABASE_URL=https://bfirenjerddoyqsihytp.supabase.co
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - USE_SUPABASE_CRON=true
+      - SERVER_PORT=8080
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - ADMIN_TOKEN=${ADMIN_TOKEN}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-volumes:
-  postgres_data:
+      - .:/app

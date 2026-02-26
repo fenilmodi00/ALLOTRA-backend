@@ -118,7 +118,7 @@ func Run(cfg *config.Config) error {
 	defer stopBackgroundJobs()
 	var backgroundWG sync.WaitGroup
 
-	startBackgroundJobs(backgroundCtx, &backgroundWG, dailyJob, resultJob, cleanupJob, gmpJob, gmpHistoryJob)
+	startBackgroundJobs(backgroundCtx, &backgroundWG, dailyJob, resultJob, cleanupJob, gmpJob, gmpHistoryJob, db)
 
 	app := fiber.New(fiber.Config{BodyLimit: 4 * 1024 * 1024})
 	registerMiddleware(app, cfg)
@@ -361,7 +361,59 @@ func startBackgroundJobs(
 	cleanupJob jobRunner,
 	gmpJob lifecycleJob,
 	gmpHistoryJob lifecycleJob,
+	db *sql.DB,
 ) {
+	useSupabaseCron := os.Getenv("USE_SUPABASE_CRON") == "true"
+
+	if useSupabaseCron {
+		// --- SUPABASE CRON MODE ---
+		// pg_cron inserts into job_dispatch table, Go polls and executes
+		logrus.Info("Using Supabase pg_cron scheduling (polling job_dispatch table)")
+
+		poller := jobs.NewJobPoller(db, 30*time.Second)
+
+		// Register each Go job as an executor for its job_type
+		poller.RegisterExecutor("daily_ipo_update", func(ctx context.Context, job jobs.JobDispatch) error {
+			safeJobRun("daily_ipo_update", dailyJob.Run)
+			return nil
+		})
+		poller.RegisterExecutor("gmp_update", func(ctx context.Context, job jobs.JobDispatch) error {
+			gmpJobRunner, ok := gmpJob.(jobRunner)
+			if ok {
+				safeJobRun("gmp_update", gmpJobRunner.Run)
+			}
+			return nil
+		})
+		poller.RegisterExecutor("gmp_history_update", func(ctx context.Context, job jobs.JobDispatch) error {
+			gmpHistoryRunner, ok := gmpHistoryJob.(jobRunner)
+			if ok {
+				safeJobRun("gmp_history_update", gmpHistoryRunner.Run)
+			}
+			return nil
+		})
+		poller.RegisterExecutor("result_release_check", func(ctx context.Context, job jobs.JobDispatch) error {
+			safeJobRun("result_release_check", resultJob.Run)
+			return nil
+		})
+		poller.RegisterExecutor("cache_cleanup", func(ctx context.Context, job jobs.JobDispatch) error {
+			safeJobRun("cache_cleanup", cleanupJob.Run)
+			return nil
+		})
+
+		poller.Start()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-ctx.Done()
+			poller.Stop()
+		}()
+
+		return
+	}
+
+	// --- LEGACY MODE (Go tickers, no Supabase cron) ---
+	logrus.Info("Using legacy Go ticker scheduling")
 	safeJobRun("daily_ipo_update_startup", dailyJob.Run)
 	gmpJob.Start()
 	gmpHistoryJob.Start()

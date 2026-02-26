@@ -21,6 +21,7 @@ type V2IPOFeedItem struct {
 	OpenDate      *string      `json:"open_date"`
 	CloseDate     *string      `json:"close_date"`
 	ListingDate   *string      `json:"listing_date"`
+	AllotmentDate *string      `json:"allotment_date,omitempty"`
 	GMP           *V2GMPNested `json:"gmp,omitempty"`
 }
 
