@@ -13,6 +13,7 @@ type Config struct {
 	ServerPort      string
 	DatabaseURL     string
 	AdminToken      string
+	AllowedOrigins  string
 	CacheTTLHours   string
 	LogLevel        string
 	IPOAlertsAPIKey string
@@ -71,6 +72,7 @@ func LoadConfig() *Config {
 		ServerPort:      getEnv("SERVER_PORT", "8080"),
 		DatabaseURL:     getEnv("DATABASE_URL", ""),
 		AdminToken:      getEnv("ADMIN_TOKEN", ""),
+		AllowedOrigins:  getEnv("ALLOWED_ORIGINS", "*"),
 		CacheTTLHours:   getEnv("CACHE_TTL_HOURS", "24"),
 		LogLevel:        getEnv("LOG_LEVEL", "info"),
 		IPOAlertsAPIKey: getEnv("IPO_ALERTS_API_KEY", ""),

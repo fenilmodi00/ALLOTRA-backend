@@ -121,7 +121,7 @@ func Run(cfg *config.Config) error {
 	startBackgroundJobs(backgroundCtx, &backgroundWG, dailyJob, resultJob, cleanupJob, gmpJob, gmpHistoryJob)
 
 	app := fiber.New(fiber.Config{BodyLimit: 4 * 1024 * 1024})
-	registerMiddleware(app)
+	registerMiddleware(app, cfg)
 	registerRoutes(app, db, cfg, ipoHandler, cacheHandler, adminHandler, checkHandler, marketHandler, gmpHandler, gmpHistoryHandler, performanceHandler, ipoService, allotmentChecker, cacheService)
 
 	serverErrors := make(chan error, 1)
@@ -171,10 +171,13 @@ func Run(cfg *config.Config) error {
 	return nil
 }
 
-func registerMiddleware(app *fiber.App) {
+func registerMiddleware(app *fiber.App, cfg *config.Config) {
 	app.Use(fiberrecover.New())
 	app.Use(logger.New())
-	app.Use(cors.New())
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: cfg.AllowedOrigins,
+		AllowHeaders: "Origin, Content-Type, Accept, Authorization, X-Admin-Token",
+	}))
 }
 
 func registerRoutes(
