@@ -206,7 +206,7 @@ func (s *GMPHistoryService) syncIPOGMPFromHistory(history *models.GMPPriceHistor
 			estimated_listing, gain_percent, last_updated, data_source,
 			stock_id, subscription_status, listing_gain
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-		ON CONFLICT (ipo_id) DO UPDATE SET
+		ON CONFLICT (ipo_id, data_source) DO UPDATE SET
 			gmp_value = EXCLUDED.gmp_value,
 			gain_percent = EXCLUDED.gain_percent,
 			estimated_listing = EXCLUDED.estimated_listing,
