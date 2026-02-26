@@ -9,26 +9,6 @@ const (
 	StatusUnknown   = "Unknown"
 )
 
-func ValidStatuses() []string {
-	return []string{
-		StatusUpcoming,
-		StatusLive,
-		StatusClosed,
-		StatusResultOut,
-		StatusListed,
-		StatusUnknown,
-	}
-}
-
-func IsValidStatus(status string) bool {
-	for _, s := range ValidStatuses() {
-		if s == status {
-			return true
-		}
-	}
-	return false
-}
-
 const (
 	JobStatusRunning   = "running"
 	JobStatusCompleted = "completed"

@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
-
-	"github.com/fenilmodi00/ipo-backend/models"
 )
 
 type SQLDiagnosticsRepository struct {
@@ -128,11 +126,4 @@ func (r *SQLDiagnosticsRepository) AnalyzeQueryPlans(ctx context.Context, sample
 	}
 
 	return plans, nil
-}
-
-func SampleIPOIDFromResults(ipos []models.IPOWithGMP) string {
-	if len(ipos) == 0 {
-		return ""
-	}
-	return ipos[0].ID.String()
 }
