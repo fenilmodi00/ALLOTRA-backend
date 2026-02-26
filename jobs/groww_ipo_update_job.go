@@ -18,12 +18,14 @@ import (
 // GrowwIPOUpdateJob runs a daily discover + scrape cycle against Groww's JSON APIs.
 // It follows the same lifecycle pattern as GMPUpdateJob (Start/Stop/Run).
 type GrowwIPOUpdateJob struct {
-	scraper   *services.GrowwScraperService
-	ticker    *time.Ticker
-	stopChan  chan struct{}
-	stopOnce  sync.Once
-	stateMu   sync.Mutex
-	isRunning bool
+	scraper    *services.GrowwScraperService
+	mapper     *services.GrowwMapper
+	ipoService *services.IPOService
+	ticker     *time.Ticker
+	stopChan   chan struct{}
+	stopOnce   sync.Once
+	stateMu    sync.Mutex
+	isRunning  bool
 }
 
 // NewGrowwIPOUpdateJob constructs a ready-to-start job.
@@ -31,6 +33,25 @@ func NewGrowwIPOUpdateJob() *GrowwIPOUpdateJob {
 	return &GrowwIPOUpdateJob{
 		scraper:  services.NewGrowwScraperService(),
 		stopChan: make(chan struct{}),
+	}
+}
+
+// NewGrowwIPOUpdateJobWithDependencies constructs a Groww job that persists
+// scraped data via mapper and IPO service.
+func NewGrowwIPOUpdateJobWithDependencies(
+	scraper *services.GrowwScraperService,
+	mapper *services.GrowwMapper,
+	ipoService *services.IPOService,
+) *GrowwIPOUpdateJob {
+	if scraper == nil {
+		scraper = services.NewGrowwScraperService()
+	}
+
+	return &GrowwIPOUpdateJob{
+		scraper:    scraper,
+		mapper:     mapper,
+		ipoService: ipoService,
+		stopChan:   make(chan struct{}),
 	}
 }
 
@@ -138,8 +159,22 @@ func (j *GrowwIPOUpdateJob) Run() {
 			fields["details_error"] = scraped.DetailsError
 		}
 		log.WithFields(fields).Debug("Groww IPO scrape result")
-	}
 
-	// TODO (post-testing phase): persist result.Results to groww_ipo_details table
-	// once data quality is confirmed to exceed Chittorgarh/InvestorGain.
+		if j.mapper == nil || j.ipoService == nil || scraped.Details == nil {
+			continue
+		}
+
+		ipoModel := j.mapper.MapToIPO(scraped, nil)
+		if ipoModel == nil {
+			log.WithField("slug", scraped.Slug).Warn("Mapper returned nil IPO model")
+			continue
+		}
+
+		if upsertErr := j.ipoService.UpsertIPO(ctx, *ipoModel); upsertErr != nil {
+			log.WithError(upsertErr).WithField("slug", scraped.Slug).Error("Failed to upsert Groww IPO")
+			continue
+		}
+
+		log.WithField("slug", scraped.Slug).Info("Groww IPO upserted")
+	}
 }

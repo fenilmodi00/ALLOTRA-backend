@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/fenilmodi00/ipo-backend/models"
 	"github.com/fenilmodi00/ipo-backend/services"
+	"github.com/fenilmodi00/ipo-backend/shared"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -210,6 +212,21 @@ func (h *GMPHistoryHandler) GetChartData(c *fiber.Ctx) error {
 	// Get complete price history from service (no date range filtering)
 	history, err := h.Service.GetPriceHistoryByIPO(ipoID, nil)
 	if err != nil {
+		// If no history found, return empty chart data instead of error
+		// This is expected for IPOs that haven't started GMP yet
+		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "no rows") {
+			return c.JSON(shared.NewV2Response(&models.ChartDataResponse{
+				IPOInfo: models.IPOBasicInfo{
+					IPOID: ipoID,
+				},
+				ChartData:  []models.ChartPoint{},
+				Statistics: models.ChartStatistics{},
+				Metadata: models.ChartMetadata{
+					DataSource:  "investorgain.com",
+					LastUpdated: time.Now(),
+				},
+			}))
+		}
 		return h.handleServiceError(c, err, ipoID)
 	}
 

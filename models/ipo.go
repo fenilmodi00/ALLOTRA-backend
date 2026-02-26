@@ -53,9 +53,11 @@ type IPO struct {
 	Risks     json.RawMessage `json:"risks" db:"risks"`
 
 	// Additional structured data from Groww
-	Financials json.RawMessage `json:"financials" db:"financials"`
-	Categories json.RawMessage `json:"categories" db:"categories"`
-	FAQs       json.RawMessage `json:"faqs" db:"faqs"`
+	Financials   json.RawMessage `json:"financials" db:"financials"`
+	Categories   json.RawMessage `json:"categories" db:"categories"`
+	FAQs         json.RawMessage `json:"faqs" db:"faqs"`
+	RichData     json.RawMessage `json:"rich_data" db:"rich_data"`
+	GrowwDetails json.RawMessage `json:"groww_details" db:"groww_details"`
 
 	// Audit fields
 	CreatedAt time.Time `json:"created_at" db:"created_at"`

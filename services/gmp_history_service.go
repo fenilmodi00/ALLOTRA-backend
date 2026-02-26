@@ -157,10 +157,92 @@ func (s *GMPHistoryService) SavePriceHistory(history *models.GMPPriceHistoryColl
 	// Invalidate cache for this IPO (Requirement 7.2)
 	s.InvalidateIPOCache(history.IPOID)
 
+	// Sync ipo_gmp with latest data from gmp_price_history for consistency
+	if err := s.syncIPOGMPFromHistory(history); err != nil {
+		s.logger.WithError(err).WithField("ipo_id", history.IPOID).Warn("Failed to sync IPO GMP from history")
+	}
+
 	s.logger.WithFields(logrus.Fields{
 		"ipo_id":        history.IPOID,
 		"total_entries": len(history.Entries),
 	}).Info("Price history saved successfully and cache invalidated")
+
+	return nil
+}
+
+// syncIPOGMPFromHistory syncs the ipo_gmp table with the latest record from gmp_price_history
+// This ensures consistency across all endpoints (feed, detail, chart)
+func (s *GMPHistoryService) syncIPOGMPFromHistory(history *models.GMPPriceHistoryCollection) error {
+	if history == nil || len(history.Entries) == 0 {
+		return nil
+	}
+
+	if s.DB == nil {
+		return fmt.Errorf("database not available")
+	}
+
+	// Get the latest entry (entries are ordered by record_date DESC)
+	latest := history.Entries[0]
+
+	// Calculate derived values
+	var ipoPrice, estimatedListing, gainPercent, listingGain float64
+	if latest.IPOPrice > 0 {
+		ipoPrice = latest.IPOPrice
+		estimatedListing = latest.IPOPrice + latest.GMPValue
+		gainPercent = (latest.GMPValue / latest.IPOPrice) * 100
+		listingGain = latest.GMPValue
+	}
+
+	// Get stock_id from ipo_list
+	var stockID sql.NullString
+	if err := s.DB.QueryRow("SELECT stock_id FROM ipo_list WHERE id = $1", history.IPOID).Scan(&stockID); err != nil {
+		s.logger.WithError(err).WithField("ipo_id", history.IPOID).Warn("Failed to get stock_id for GMP sync")
+	}
+
+	// Upsert into ipo_gmp using ipo_id as key
+	query := `
+		INSERT INTO ipo_gmp (
+			id, ipo_name, ipo_id, company_code, ipo_price, gmp_value,
+			estimated_listing, gain_percent, last_updated, data_source,
+			stock_id, subscription_status, listing_gain
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		ON CONFLICT (ipo_id) DO UPDATE SET
+			gmp_value = EXCLUDED.gmp_value,
+			gain_percent = EXCLUDED.gain_percent,
+			estimated_listing = EXCLUDED.estimated_listing,
+			listing_gain = EXCLUDED.listing_gain,
+			subscription_status = EXCLUDED.subscription_status,
+			ipo_price = EXCLUDED.ipo_price,
+			last_updated = EXCLUDED.last_updated,
+			data_source = EXCLUDED.data_source
+	`
+
+	_, err := s.DB.Exec(query,
+		uuid.New().String(),
+		history.IPOName,
+		history.IPOID,
+		history.CompanyCode,
+		ipoPrice,
+		latest.GMPValue,
+		estimatedListing,
+		gainPercent,
+		latest.LastUpdated,
+		"investorgain.com",
+		stockID.String,
+		latest.SubscriptionStatus,
+		listingGain,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to sync IPO GMP: %w", err)
+	}
+
+	s.logger.WithFields(logrus.Fields{
+		"ipo_id":            history.IPOID,
+		"gmp_value":         latest.GMPValue,
+		"gain_percent":      gainPercent,
+		"estimated_listing": estimatedListing,
+	}).Info("Synced IPO GMP from price history")
 
 	return nil
 }
@@ -514,9 +596,7 @@ func (s *GMPHistoryService) ScrapeIPOPriceHistoryWithNameAndStockID(ipoID string
 	}
 
 	// Date sanity check: reject scraped data that clearly belongs to a different IPO.
-	// If the IPO has an open_date and the scraped data contains records from more than
-	// 90 days before that date, the InvestorGain numeric ID was resolved to the wrong
-	// IPO (e.g., "manilam-industries-india" matched "manilam-industries" from 2023).
+	// 1. If the IPO has an open_date, check if records are from more than 90 days before that date
 	var openDate sql.NullTime
 	if dbErr := s.DB.QueryRow("SELECT open_date FROM ipo_list WHERE id = $1", ipoID).Scan(&openDate); dbErr == nil && openDate.Valid {
 		cutoff := openDate.Time.AddDate(0, -3, 0) // 90 days before open
@@ -532,6 +612,29 @@ func (s *GMPHistoryService) ScrapeIPOPriceHistoryWithNameAndStockID(ipoID string
 				}).Error("Scraped data contains records from before IPO open date — likely wrong InvestorGain ID match, rejecting all data")
 				return nil, fmt.Errorf("scraped data date sanity check failed: record_date %s is before IPO open_date %s minus 90 days for %s (%s)",
 					entry.RecordDate.Format("2006-01-02"), openDate.Time.Format("2006-01-02"), ipoName, companyCode)
+			}
+		}
+	} else {
+		// 2. If open_date is NULL (upcoming IPOs), reject data if ALL records are from >1 year ago
+		// This prevents new upcoming IPOs from matching old completed IPOs (like ID 331 from 2023)
+		if len(scrapedData.PriceHistory) > 0 {
+			allOld := true
+			oneYearAgo := time.Now().AddDate(-1, 0, 0)
+			for _, entry := range scrapedData.PriceHistory {
+				if entry.RecordDate.After(oneYearAgo) {
+					allOld = false
+					break
+				}
+			}
+
+			if allOld {
+				s.logger.WithFields(logrus.Fields{
+					"ipo_id":        ipoID,
+					"company_code":  companyCode,
+					"ipo_name":      ipoName,
+					"latest_record": scrapedData.PriceHistory[0].RecordDate.Format("2006-01-02"),
+				}).Error("Scraped data contains ONLY old records (>1 year) for an IPO with no open_date — likely wrong InvestorGain ID match")
+				return nil, fmt.Errorf("scraped data sanity check failed: all records are >1 year old for upcoming IPO %s", ipoName)
 			}
 		}
 	}

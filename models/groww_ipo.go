@@ -146,6 +146,35 @@ type GrowwCMSResponse struct {
 	PublishedAt string `json:"publishedAt"`
 }
 
+// GrowwParsedCMS stores structured fields extracted from CMS HTML content.
+type GrowwParsedCMS struct {
+	Objectives       []GrowwObjective     `json:"objectives,omitempty"`
+	LeadManager      string               `json:"lead_manager,omitempty"`
+	RegistrarDetails *GrowwRegistrarInfo  `json:"registrar_details,omitempty"`
+	ContactDetails   *GrowwContactDetails `json:"contact_details,omitempty"`
+}
+
+// GrowwObjective describes one IPO objective row from CMS content.
+type GrowwObjective struct {
+	Purpose     string `json:"purpose"`
+	Amount      string `json:"amount"`
+	Description string `json:"description"`
+}
+
+// GrowwRegistrarInfo contains registrar contact details extracted from CMS.
+type GrowwRegistrarInfo struct {
+	Name  string `json:"name"`
+	Phone string `json:"phone"`
+	Email string `json:"email"`
+}
+
+// GrowwContactDetails contains issuer contact details extracted from CMS.
+type GrowwContactDetails struct {
+	Address string `json:"address"`
+	Phone   string `json:"phone"`
+	Email   string `json:"email"`
+}
+
 // GrowwScrapedIPO is the combined, normalized result of scraping both APIs for one IPO.
 // This is what the test endpoint returns and what future DB storage will consume.
 type GrowwScrapedIPO struct {
@@ -159,6 +188,9 @@ type GrowwScrapedIPO struct {
 
 	// From CMS API
 	CMS *GrowwCMSResponse `json:"cms,omitempty"`
+
+	// Parsed from CMS HTML content
+	ParsedCMS *GrowwParsedCMS `json:"parsed_cms,omitempty"`
 
 	// Scrape health
 	DetailsError string `json:"details_error,omitempty"`

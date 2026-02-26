@@ -192,3 +192,53 @@ func TestScrapeIPO_Details404_RequiresFallback(t *testing.T) {
 
 	assert.NotEmpty(t, result.DetailsError, "DetailsError should be set for 404")
 }
+
+func TestScrapeIPO_ParsesCMSContent(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if strings.Contains(path, "stocks_primary_market_data") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"companyName":"Test IPO","status":"ACTIVE"}`))
+			return
+		}
+		if strings.Contains(path, "ipo-product-content") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"id": 1,
+				"slug": "test-ipo",
+				"content": "<h2>Objective of Test IPO</h2><table><tr><td>Purpose / Objective</td><td>Approx. Amount (₹ Crore)</td><td>Description</td></tr><tr><td>Solar Plant</td><td>7.85</td><td>Setup plant</td></tr></table><h2>Test IPO Lead Manager</h2><p>Lead Manager Pvt Ltd</p>",
+				"updatedAt": "2026-01-01T00:00:00Z",
+				"publishedAt": "2026-01-01T00:00:00Z"
+			}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	oldDetailsURL := growwDetailsBaseURL
+	oldCMSURL := growwCMSBaseURL
+	growwDetailsBaseURL = server.URL + "/v1/api/stocks_primary_market_data/v1/ipo/company/%s?isHniEnabled=true"
+	growwCMSBaseURL = server.URL + "/api/v1/ipo-product-content/%s"
+	defer func() {
+		growwDetailsBaseURL = oldDetailsURL
+		growwCMSBaseURL = oldCMSURL
+	}()
+
+	service := &GrowwScraperService{
+		httpClient:     server.Client(),
+		circuitBreaker: testCircuitBreaker(t),
+		retryConfig:    testRetryConfig(),
+		logger:         testLogger(t),
+	}
+
+	result := service.ScrapeIPO(context.Background(), "test-ipo")
+
+	assert.NotNil(t, result.CMS)
+	assert.NotNil(t, result.ParsedCMS)
+	assert.Equal(t, "Lead Manager Pvt Ltd", result.ParsedCMS.LeadManager)
+	assert.Len(t, result.ParsedCMS.Objectives, 1)
+	assert.Equal(t, "Solar Plant", result.ParsedCMS.Objectives[0].Purpose)
+}

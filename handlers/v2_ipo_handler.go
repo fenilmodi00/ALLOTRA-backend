@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -132,10 +133,41 @@ func (h *V2IPOHandler) GetByID(c *fiber.Ctx) error {
 		MinAmount:          ipo.MinAmount,
 		MinInvestment:      minInvestment,
 		SubscriptionStatus: ipo.SubscriptionStatus,
+		Strengths:          ipo.Strengths,
+		Risks:              ipo.Risks,
 		Financials:         ipo.Financials,
 		Categories:         ipo.Categories,
 		FAQs:               ipo.FAQs,
 		AllotmentDate:      formatDatePtr(ipo.ResultDate),
+	}
+
+	if len(ipo.RichData) > 0 {
+		var parsedCMS models.GrowwParsedCMS
+		if err := json.Unmarshal(ipo.RichData, &parsedCMS); err == nil {
+			detail.CMSDetails = &parsedCMS
+			if len(parsedCMS.Objectives) > 0 {
+				if b, marshalErr := json.Marshal(parsedCMS.Objectives); marshalErr == nil {
+					detail.Objectives = b
+				}
+			}
+			detail.LeadManager = parsedCMS.LeadManager
+			if parsedCMS.RegistrarDetails != nil {
+				detail.RegistrarPhone = parsedCMS.RegistrarDetails.Phone
+				detail.RegistrarEmail = parsedCMS.RegistrarDetails.Email
+			}
+			if parsedCMS.ContactDetails != nil {
+				detail.CompanyAddress = parsedCMS.ContactDetails.Address
+				detail.CompanyPhone = parsedCMS.ContactDetails.Phone
+				detail.CompanyEmail = parsedCMS.ContactDetails.Email
+			}
+		}
+	}
+
+	if len(ipo.GrowwDetails) > 0 {
+		var growwDetails models.GrowwIPODetailsResponse
+		if err := json.Unmarshal(ipo.GrowwDetails, &growwDetails); err == nil {
+			detail.GrowwDetails = &growwDetails
+		}
 	}
 
 	if ipo.GMPValue != nil {

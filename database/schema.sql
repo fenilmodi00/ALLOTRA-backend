@@ -50,6 +50,11 @@ CREATE TABLE ipo_list (
     -- Additional structured data
     strengths JSONB DEFAULT '[]',
     risks JSONB DEFAULT '[]',
+    financials JSONB DEFAULT '[]',
+    categories JSONB DEFAULT '[]',
+    faqs JSONB DEFAULT '[]',
+    rich_data JSONB DEFAULT '{}',
+    groww_details JSONB DEFAULT '{}',
     
     -- Audit fields
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -127,6 +127,20 @@ func (s *GrowwScraperService) ScrapeIPO(ctx context.Context, slug string) *model
 	}()
 
 	wg.Wait()
+
+	if result.CMS != nil && strings.TrimSpace(result.CMS.Content) != "" {
+		parsedCMS, err := ParseCMSContent(result.CMS.Content)
+		if err != nil {
+			s.logger.WithFields(logrus.Fields{
+				"component": "GrowwScraperService",
+				"slug":      slug,
+				"error":     err,
+			}).Warn("Failed to parse Groww CMS content")
+		} else {
+			result.ParsedCMS = parsedCMS
+		}
+	}
+
 	return result
 }
 

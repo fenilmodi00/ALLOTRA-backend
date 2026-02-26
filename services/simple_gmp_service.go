@@ -555,6 +555,8 @@ func (s *SimpleGMPService) SaveGMPData(gmpList []models.EnhancedGMPData) error {
 	defer tx.Rollback()
 
 	// Prepare insert statement with all fields
+	// Use ipo_id as conflict key to match history sync
+	// This ensures history-synced data is not overwritten by live scraper
 	stmt, err := tx.Prepare(`
 		INSERT INTO ipo_gmp (
 			id, ipo_name, ipo_id, company_code, ipo_price, gmp_value,
@@ -562,8 +564,8 @@ func (s *SimpleGMPService) SaveGMPData(gmpList []models.EnhancedGMPData) error {
 			data_source, stock_id, subscription_status, listing_gain, 
 			ipo_status, extraction_metadata
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-		ON CONFLICT (ipo_name) DO UPDATE SET
-			ipo_id      = COALESCE(EXCLUDED.ipo_id, ipo_gmp.ipo_id),
+		ON CONFLICT (ipo_id) DO UPDATE SET
+			ipo_name      = COALESCE(EXCLUDED.ipo_name, ipo_gmp.ipo_name),
 			company_code = COALESCE(EXCLUDED.company_code, ipo_gmp.company_code),
 			stock_id    = COALESCE(EXCLUDED.stock_id, ipo_gmp.stock_id),
 			gmp_value = EXCLUDED.gmp_value,
@@ -574,6 +576,7 @@ func (s *SimpleGMPService) SaveGMPData(gmpList []models.EnhancedGMPData) error {
 			ipo_status = EXCLUDED.ipo_status,
 			extraction_metadata = EXCLUDED.extraction_metadata,
 			last_updated = EXCLUDED.last_updated
+		WHERE ipo_gmp.last_updated < EXCLUDED.last_updated
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)

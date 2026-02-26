@@ -32,6 +32,9 @@ func (m *GrowwMapper) MapToIPO(growwData *models.GrowwScrapedIPO, chittItem *Chi
 
 	if growwData.Details != nil {
 		d := growwData.Details
+		if b, err := json.Marshal(d); err == nil {
+			ipo.GrowwDetails = b
+		}
 		ipo.Name = d.CompanyName
 		ipo.Symbol = &d.Symbol
 		ipo.Registrar = d.Registrar
@@ -75,19 +78,29 @@ func (m *GrowwMapper) MapToIPO(growwData *models.GrowwScrapedIPO, chittItem *Chi
 		}
 
 		if len(d.Pros) > 0 {
-			ipo.Strengths, _ = json.Marshal(d.Pros)
+			if b, err := json.Marshal(d.Pros); err == nil {
+				ipo.Strengths = b
+			}
 		}
 		if len(d.Cons) > 0 {
-			ipo.Risks, _ = json.Marshal(d.Cons)
+			if b, err := json.Marshal(d.Cons); err == nil {
+				ipo.Risks = b
+			}
 		}
 		if len(d.Financials) > 0 {
-			ipo.Financials, _ = json.Marshal(d.Financials)
+			if b, err := json.Marshal(d.Financials); err == nil {
+				ipo.Financials = b
+			}
 		}
 		if len(d.Categories) > 0 {
-			ipo.Categories, _ = json.Marshal(d.Categories)
+			if b, err := json.Marshal(d.Categories); err == nil {
+				ipo.Categories = b
+			}
 		}
 		if len(d.FAQs) > 0 {
-			ipo.FAQs, _ = json.Marshal(d.FAQs)
+			if b, err := json.Marshal(d.FAQs); err == nil {
+				ipo.FAQs = b
+			}
 		}
 
 		ipo.CompanyCode = m.utilityService.GenerateCompanyCode(d.CompanyName)
@@ -102,6 +115,12 @@ func (m *GrowwMapper) MapToIPO(growwData *models.GrowwScrapedIPO, chittItem *Chi
 	if growwData.CMS != nil && growwData.CMS.Content != "" {
 		if ipo.Description == nil {
 			ipo.Description = &growwData.CMS.Content
+		}
+	}
+
+	if growwData.ParsedCMS != nil {
+		if b, err := json.Marshal(growwData.ParsedCMS); err == nil {
+			ipo.RichData = b
 		}
 	}
 
