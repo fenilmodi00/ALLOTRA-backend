@@ -240,7 +240,7 @@ func registerRoutes(
 	api.Get("/ipos/:id", ipoHandler.GetIPOByID)
 
 	// GMP history routes
-	api.Post("/gmp/backfill", gmpHistoryHandler.BackfillGMPHistory)
+	api.Post("/gmp/backfill", adminAuthMiddleware(cfg.AdminToken), gmpHistoryHandler.BackfillGMPHistory)
 	api.Get("/gmp/history/health", gmpHistoryHandler.GetHealthCheck)
 	api.Get("/gmp/history/metrics", gmpHistoryHandler.GetServiceMetrics)
 	// Parameterized routes (must be after static routes)
@@ -288,7 +288,7 @@ func registerRoutes(
 
 	// Groww IPO scraper — testing & trigger endpoints
 
-	perf := api.Group("/performance")
+	perf := api.Group("/performance", adminAuthMiddleware(cfg.AdminToken))
 	perf.Get("/metrics", performanceHandler.GetPerformanceMetrics)
 	perf.Post("/test", performanceHandler.RunPerformanceTest)
 	perf.Delete("/cache", performanceHandler.ClearCache)

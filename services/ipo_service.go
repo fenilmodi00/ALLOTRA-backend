@@ -385,6 +385,13 @@ func (opt *DatabaseOptimizer) isRetryableError(err error) bool {
 		"lock wait timeout",
 		"connection lost",
 		"server shutdown",
+		"broken pipe",
+		"eof",
+		"bad connection",
+		"i/o timeout",
+		"network is unreachable",
+		"database system is starting up",
+		"database system is shutting down",
 	}
 
 	for _, retryableErr := range retryableErrors {

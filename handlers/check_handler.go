@@ -1,11 +1,15 @@
 package handlers
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"time"
 
 	"github.com/fenilmodi00/ipo-backend/models"
 	"github.com/fenilmodi00/ipo-backend/services"
 	"github.com/gofiber/fiber/v2"
+	"github.com/sirupsen/logrus"
 )
 
 type CheckHandler struct {
@@ -32,10 +36,20 @@ func (h *CheckHandler) CheckAllotment(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
 	}
 
+	// Hash PAN for privacy/security before any storage or logging
+	hash := sha256.Sum256([]byte(req.PAN))
+	panHash := hex.EncodeToString(hash[:])
+
 	// 1. Check Cache First
-	// TODO: Hash PAN before checking cache (omitted for brevity in this step)
-	// cached, _ := h.CacheService.GetCachedResult(c.Context(), req.IPOID, req.PAN)
-	// if cached != nil { ... return cached ... }
+	if h.CacheService != nil {
+		cached, err := h.CacheService.GetCachedResult(c.Context(), req.IPOID, panHash)
+		if err == nil && cached != nil {
+			return c.JSON(fiber.Map{
+				"success": true,
+				"data":    cached,
+			})
+		}
+	}
 
 	// 2. Get IPO Details
 	ipo, err := h.IPOService.GetIPOByID(c.Context(), req.IPOID)
@@ -54,14 +68,24 @@ func (h *CheckHandler) CheckAllotment(c *fiber.Ctx) error {
 
 	// 4. Cache Result
 	result := models.IPOResultCache{
-		PanHash:        req.PAN, // In real app, hash this!
+		PanHash:        panHash,
 		IPOID:          ipo.ID,
 		Status:         status,
 		SharesAllotted: shares,
 		Source:         "live_check",
 		Timestamp:      time.Now(),
 	}
-	// h.CacheService.StoreResult(c.Context(), &result) // Fire and forget or wait
+
+	if h.CacheService != nil {
+		// Use a detached context for caching so it doesn't get cancelled if request ends
+		go func(res models.IPOResultCache) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := h.CacheService.StoreResult(ctx, &res); err != nil {
+				logrus.WithError(err).Warn("Failed to cache allotment result")
+			}
+		}(result)
+	}
 
 	return c.JSON(fiber.Map{
 		"success": true,

@@ -37,6 +37,124 @@ func NewDefaultIPOScraperConfiguration() *IPOScraperConfiguration {
 
 // Note: HTTPRequestRateLimiter is now imported from shared package
 
+var (
+	htmlTagRegex    = regexp.MustCompile(`<[^>]*>`)
+	whitespaceRegex = regexp.MustCompile(`\s+`)
+	printableRegex  = regexp.MustCompile(`[^\x20-\x7E\p{L}\p{N}\p{P}\p{S}]`)
+
+	navigationRegexes  []*regexp.Regexp
+	boilerplateRegexes []*regexp.Regexp
+	boilerplatePatterns []string // Kept for logging purposes
+)
+
+func init() {
+	// Navigation elements specific to Chittorgarh pages - using more aggressive patterns
+	navPatterns := []string{
+		// Remove dashboard and navigation elements (anywhere in text)
+		`(?i)\bdashboard\s*ipo\s*list\b`,
+		`(?i)\bipo\s*list\s*ipo\s*list\b`,
+		`(?i)\bdashboard\b`,
+		`(?i)\bipo\s*list\b`,
+
+		// Remove IPO details navigation (anywhere in text)
+		`(?i)\bipo\s*details\b`,
+		`(?i)\bbookbuilding\s*ipo\b`,
+		`(?i)\|\s*₹\d+\s*cr\s*\|`,
+		`(?i)₹\d+\s*cr\b`,
+
+		// Remove common navigation links (anywhere in text)
+		`(?i)\bmessages\b`,
+		`(?i)\bgmp\b`,
+		`(?i)\bdocs\b`,
+		`(?i)\brhp\b`,
+		`(?i)\bdrhp\b`,
+		`(?i)\banchor\s*investor\s*link\b`,
+		`(?i)\bsubscription\b`,
+		`(?i)\breviews\b`,
+		`(?i)\ballotment\b`,
+		`(?i)\bstock\s*price\b`,
+		`(?i)\bfinal\s*prospectus\b`,
+
+		// Remove listing information (anywhere in text)
+		`(?i)\blisting\s*at\s*bse\b`,
+		`(?i)\blisting\s*at\s*nse\b`,
+		`(?i)\blisted\s*at\s*bse\b`,
+		`(?i)\blisted\s*at\s*nse\b`,
+		`(?i)\bbse\s*nse\b`,
+		`(?i)\bnse\s*bse\b`,
+
+		// Remove additional navigation elements found in testing
+		`(?i)\bipo\s*news\b`,
+		`(?i)\bipo\s*calendar\b`,
+		`(?i)\bipo\s*performance\b`,
+		`(?i)\bipo\s*analysis\b`,
+		`(?i)\bipo\s*rating\b`,
+		`(?i)\bipo\s*recommendation\b`,
+		`(?i)\bipo\s*apply\b`,
+		`(?i)\bapply\s*online\b`,
+		`(?i)\bipo\s*forms\b`,
+		`(?i)\bipo\s*documents\b`,
+
+		// Remove menu and navigation text
+		`(?i)\bmenu\b`,
+		`(?i)\bnavigation\b`,
+		`(?i)\bhome\b`,
+		`(?i)\bback\s*to\s*top\b`,
+		`(?i)\bshare\s*this\b`,
+		`(?i)\bprint\s*this\b`,
+		`(?i)\bemail\s*this\b`,
+
+		// Remove common separators and formatting (anywhere in text)
+		`(?i)\s*\|\s*`,
+		`(?i)\s*-\s*`,
+		`(?i)\s*•\s*`,
+		`(?i)\s*→\s*`,
+		`(?i)\s*»\s*`,
+
+		// Remove standalone numbers and currency amounts that are navigation artifacts
+		`(?i)^\s*\d+\s*$`,
+		`(?i)^\s*₹\s*\d+\s*$`,
+		`(?i)^\s*rs\.?\s*\d+\s*$`,
+
+		// Remove common call-to-action phrases
+		`(?i)\bclick\s*here\b`,
+		`(?i)\bread\s*more\b`,
+		`(?i)\bmore\s*details\b`,
+		`(?i)\bview\s*details\b`,
+		`(?i)\bsee\s*more\b`,
+		`(?i)\blearn\s*more\b`,
+		`(?i)\bfind\s*out\s*more\b`,
+
+		// Remove date and time artifacts
+		`(?i)\bupdated\s*on\b`,
+		`(?i)\bpublished\s*on\b`,
+		`(?i)\blast\s*updated\b`,
+		`(?i)\bposted\s*on\b`,
+	}
+
+	for _, p := range navPatterns {
+		navigationRegexes = append(navigationRegexes, regexp.MustCompile(p))
+	}
+
+	// Common boilerplate phrases to remove
+	boilerplatePatterns = []string{
+		`(?i)^company description:\s*`,
+		`(?i)^about us:\s*`,
+		`(?i)^about the company:\s*`,
+		`(?i)^business overview:\s*`,
+		`(?i)^company details:\s*`,
+		`(?i)^business model:\s*`,
+		`(?i)^about:\s*`,
+		`(?i)\s*read more\s*$`,
+		`(?i)\s*click here for more\s*$`,
+		`(?i)\s*more details\s*$`,
+	}
+
+	for _, p := range boilerplatePatterns {
+		boilerplateRegexes = append(boilerplateRegexes, regexp.MustCompile(p))
+	}
+}
+
 // HTMLDataExtractor handles extraction and normalization of IPO data from HTML documents
 type HTMLDataExtractor struct {
 	// Stateless service for extracting structured data from HTML
@@ -683,18 +801,15 @@ func (extractor *HTMLDataExtractor) cleanCompanyText(text string) string {
 	}
 
 	// Remove HTML tags if any remain
-	htmlTagRegex := regexp.MustCompile(`<[^>]*>`)
 	text = htmlTagRegex.ReplaceAllString(text, "")
 
 	// Normalize whitespace
-	whitespaceRegex := regexp.MustCompile(`\s+`)
 	text = whitespaceRegex.ReplaceAllString(text, " ")
 
 	// Remove leading and trailing whitespace
 	text = strings.TrimSpace(text)
 
 	// Handle UTF-8 encoding issues by removing non-printable characters
-	printableRegex := regexp.MustCompile(`[^\x20-\x7E\p{L}\p{N}\p{P}\p{S}]`)
 	text = printableRegex.ReplaceAllString(text, "")
 
 	return text
@@ -723,30 +838,15 @@ func (extractor *HTMLDataExtractor) cleanCompanyTextWithErrorHandling(text strin
 		}
 	}()
 
-	htmlTagRegex, err := regexp.Compile(`<[^>]*>`)
-	if err != nil {
-		logger.WithError(err).Error("Failed to compile HTML tag regex")
-		return "", fmt.Errorf("failed to compile HTML tag regex: %w", err)
-	}
 	text = htmlTagRegex.ReplaceAllString(text, "")
 
 	// Normalize whitespace with error handling
-	whitespaceRegex, err := regexp.Compile(`\s+`)
-	if err != nil {
-		logger.WithError(err).Error("Failed to compile whitespace regex")
-		return "", fmt.Errorf("failed to compile whitespace regex: %w", err)
-	}
 	text = whitespaceRegex.ReplaceAllString(text, " ")
 
 	// Remove leading and trailing whitespace
 	text = strings.TrimSpace(text)
 
 	// Handle UTF-8 encoding issues by removing non-printable characters with error handling
-	printableRegex, err := regexp.Compile(`[^\x20-\x7E\p{L}\p{N}\p{P}\p{S}]`)
-	if err != nil {
-		logger.WithError(err).Error("Failed to compile printable characters regex")
-		return "", fmt.Errorf("failed to compile printable characters regex: %w", err)
-	}
 	text = printableRegex.ReplaceAllString(text, "")
 
 	finalLength := len(text)
@@ -765,97 +865,12 @@ func (extractor *HTMLDataExtractor) removeNavigationElements(text string) string
 		return ""
 	}
 
-	// Navigation elements specific to Chittorgarh pages - using more aggressive patterns
-	navigationPatterns := []string{
-		// Remove dashboard and navigation elements (anywhere in text)
-		`(?i)\bdashboard\s*ipo\s*list\b`,
-		`(?i)\bipo\s*list\s*ipo\s*list\b`,
-		`(?i)\bdashboard\b`,
-		`(?i)\bipo\s*list\b`,
-
-		// Remove IPO details navigation (anywhere in text)
-		`(?i)\bipo\s*details\b`,
-		`(?i)\bbookbuilding\s*ipo\b`,
-		`(?i)\|\s*₹\d+\s*cr\s*\|`,
-		`(?i)₹\d+\s*cr\b`,
-
-		// Remove common navigation links (anywhere in text)
-		`(?i)\bmessages\b`,
-		`(?i)\bgmp\b`,
-		`(?i)\bdocs\b`,
-		`(?i)\brhp\b`,
-		`(?i)\bdrhp\b`,
-		`(?i)\banchor\s*investor\s*link\b`,
-		`(?i)\bsubscription\b`,
-		`(?i)\breviews\b`,
-		`(?i)\ballotment\b`,
-		`(?i)\bstock\s*price\b`,
-		`(?i)\bfinal\s*prospectus\b`,
-
-		// Remove listing information (anywhere in text)
-		`(?i)\blisting\s*at\s*bse\b`,
-		`(?i)\blisting\s*at\s*nse\b`,
-		`(?i)\blisted\s*at\s*bse\b`,
-		`(?i)\blisted\s*at\s*nse\b`,
-		`(?i)\bbse\s*nse\b`,
-		`(?i)\bnse\s*bse\b`,
-
-		// Remove additional navigation elements found in testing
-		`(?i)\bipo\s*news\b`,
-		`(?i)\bipo\s*calendar\b`,
-		`(?i)\bipo\s*performance\b`,
-		`(?i)\bipo\s*analysis\b`,
-		`(?i)\bipo\s*rating\b`,
-		`(?i)\bipo\s*recommendation\b`,
-		`(?i)\bipo\s*apply\b`,
-		`(?i)\bapply\s*online\b`,
-		`(?i)\bipo\s*forms\b`,
-		`(?i)\bipo\s*documents\b`,
-
-		// Remove menu and navigation text
-		`(?i)\bmenu\b`,
-		`(?i)\bnavigation\b`,
-		`(?i)\bhome\b`,
-		`(?i)\bback\s*to\s*top\b`,
-		`(?i)\bshare\s*this\b`,
-		`(?i)\bprint\s*this\b`,
-		`(?i)\bemail\s*this\b`,
-
-		// Remove common separators and formatting (anywhere in text)
-		`(?i)\s*\|\s*`,
-		`(?i)\s*-\s*`,
-		`(?i)\s*•\s*`,
-		`(?i)\s*→\s*`,
-		`(?i)\s*»\s*`,
-
-		// Remove standalone numbers and currency amounts that are navigation artifacts
-		`(?i)^\s*\d+\s*$`,
-		`(?i)^\s*₹\s*\d+\s*$`,
-		`(?i)^\s*rs\.?\s*\d+\s*$`,
-
-		// Remove common call-to-action phrases
-		`(?i)\bclick\s*here\b`,
-		`(?i)\bread\s*more\b`,
-		`(?i)\bmore\s*details\b`,
-		`(?i)\bview\s*details\b`,
-		`(?i)\bsee\s*more\b`,
-		`(?i)\blearn\s*more\b`,
-		`(?i)\bfind\s*out\s*more\b`,
-
-		// Remove date and time artifacts
-		`(?i)\bupdated\s*on\b`,
-		`(?i)\bpublished\s*on\b`,
-		`(?i)\blast\s*updated\b`,
-		`(?i)\bposted\s*on\b`,
-	}
-
-	for _, pattern := range navigationPatterns {
-		regex := regexp.MustCompile(pattern)
+	for _, regex := range navigationRegexes {
 		text = regex.ReplaceAllString(text, " ")
 	}
 
 	// Clean up multiple spaces and trim
-	text = regexp.MustCompile(`\s+`).ReplaceAllString(text, " ")
+	text = whitespaceRegex.ReplaceAllString(text, " ")
 	text = strings.TrimSpace(text)
 
 	return text
@@ -867,22 +882,7 @@ func (extractor *HTMLDataExtractor) removeBoilerplateText(text string) string {
 		return ""
 	}
 
-	// Common boilerplate phrases to remove
-	boilerplatePatterns := []string{
-		`(?i)^company description:\s*`,
-		`(?i)^about us:\s*`,
-		`(?i)^about the company:\s*`,
-		`(?i)^business overview:\s*`,
-		`(?i)^company details:\s*`,
-		`(?i)^business model:\s*`,
-		`(?i)^about:\s*`,
-		`(?i)\s*read more\s*$`,
-		`(?i)\s*click here for more\s*$`,
-		`(?i)\s*more details\s*$`,
-	}
-
-	for _, pattern := range boilerplatePatterns {
-		regex := regexp.MustCompile(pattern)
+	for _, regex := range boilerplateRegexes {
 		text = regex.ReplaceAllString(text, "")
 	}
 
@@ -911,37 +911,20 @@ func (extractor *HTMLDataExtractor) removeBoilerplateTextWithLogging(text string
 	originalText := text
 	originalLength := len(text)
 
-	// Common boilerplate phrases to remove
-	boilerplatePatterns := []string{
-		`(?i)^company description:\s*`,
-		`(?i)^about us:\s*`,
-		`(?i)^about the company:\s*`,
-		`(?i)^business overview:\s*`,
-		`(?i)^company details:\s*`,
-		`(?i)^business model:\s*`,
-		`(?i)^about:\s*`,
-		`(?i)\s*read more\s*$`,
-		`(?i)\s*click here for more\s*$`,
-		`(?i)\s*more details\s*$`,
-	}
-
 	patternsMatched := 0
-	for i, pattern := range boilerplatePatterns {
-		regex, err := regexp.Compile(pattern)
-		if err != nil {
-			logger.WithFields(logrus.Fields{
-				"pattern_index": i,
-				"pattern":       pattern,
-				"error":         err,
-			}).Warn("Failed to compile boilerplate regex pattern")
-			continue
-		}
-
+	for i, regex := range boilerplateRegexes {
 		if regex.MatchString(text) {
 			patternsMatched++
 			text = regex.ReplaceAllString(text, "")
+
+			// Use the pattern string from the array for logging if available
+			patternStr := "pattern"
+			if i < len(boilerplatePatterns) {
+				patternStr = boilerplatePatterns[i]
+			}
+
 			logger.WithFields(logrus.Fields{
-				"pattern":     pattern,
+				"pattern":     patternStr,
 				"text_before": extractor.truncateForLogging(originalText, 50),
 				"text_after":  extractor.truncateForLogging(text, 50),
 			}).Debug("Removed boilerplate pattern")
@@ -1004,7 +987,6 @@ func (extractor *HTMLDataExtractor) normalizeTextContent(text string) string {
 	text = strings.TrimSpace(text)
 
 	// Normalize multiple whitespace characters to single spaces
-	whitespaceRegex := regexp.MustCompile(`\s+`)
 	text = whitespaceRegex.ReplaceAllString(text, " ")
 
 	// Remove common currency symbols and prefixes

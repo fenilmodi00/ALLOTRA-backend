@@ -16,6 +16,7 @@ type Config struct {
 	CacheTTLHours   string
 	LogLevel        string
 	IPOAlertsAPIKey string
+	PingTimeout     time.Duration
 }
 
 // SimplifiedRateLimitConfig holds simplified rate limiting configuration
@@ -67,6 +68,13 @@ func LoadConfig() *Config {
 		logrus.Warn("Error loading .env file, using system environment variables")
 	}
 
+	pingTimeoutStr := getEnv("PING_TIMEOUT", "2s")
+	pingTimeout, err := time.ParseDuration(pingTimeoutStr)
+	if err != nil {
+		logrus.Warnf("Invalid PING_TIMEOUT value: %s, using default 2s", pingTimeoutStr)
+		pingTimeout = 2 * time.Second
+	}
+
 	return &Config{
 		ServerPort:      getEnv("SERVER_PORT", "8080"),
 		DatabaseURL:     getEnv("DATABASE_URL", ""),
@@ -74,6 +82,7 @@ func LoadConfig() *Config {
 		CacheTTLHours:   getEnv("CACHE_TTL_HOURS", "24"),
 		LogLevel:        getEnv("LOG_LEVEL", "info"),
 		IPOAlertsAPIKey: getEnv("IPO_ALERTS_API_KEY", ""),
+		PingTimeout:     pingTimeout,
 	}
 }
 

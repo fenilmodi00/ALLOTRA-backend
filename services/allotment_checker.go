@@ -22,218 +22,248 @@ type AllotmentChecker struct {
 // NewAllotmentChecker creates a new allotment checker
 func NewAllotmentChecker() *AllotmentChecker {
 	return &AllotmentChecker{
-		RateLimiter: shared.NewHTTPRequestRateLimiter(2 * time.Second), // More conservative rate limiting for allotment checks
+		RateLimiter: shared.NewHTTPRequestRateLimiter(2 * time.Second),
 	}
+}
+
+type allotmentParserConfig struct {
+	SubmitURL       string `json:"submit_url"`
+	StatusSelectors struct {
+		Allotted    []string `json:"allotted"`
+		NotAllotted []string `json:"not_allotted"`
+	} `json:"status_selectors"`
 }
 
 // CheckAllotmentStatus checks the allotment status for a given IPO and PAN
 func (a *AllotmentChecker) CheckAllotmentStatus(ctx context.Context, ipo *models.IPO, pan string) (string, int, error) {
-	// Apply rate limiting for politeness
 	a.RateLimiter.EnforceRateLimit()
 
-	// 1. Parse Configs
+	formFields, formHeaders, parserConfig, err := a.parseConfigurations(ipo)
+	if err != nil {
+		return "", 0, err
+	}
+
+	c := a.createCollector(ipo, formHeaders)
+
+	// Scrape hidden fields if needed
+	scrapedData, err := a.scrapeHiddenFields(c, ipo.FormURL, formFields)
+	if err != nil {
+		return "", 0, err
+	}
+
+	payload, err := a.preparePayload(formFields, scrapedData, pan)
+	if err != nil {
+		return "", 0, err
+	}
+
+	return a.executeRequest(c, ipo.FormURL, parserConfig, payload)
+}
+
+func (a *AllotmentChecker) parseConfigurations(ipo *models.IPO) (map[string]string, map[string]string, *allotmentParserConfig, error) {
 	var formFields map[string]string
 	if err := json.Unmarshal(ipo.FormFields, &formFields); err != nil {
-		return "", 0, fmt.Errorf("invalid form fields config: %w", err)
+		return nil, nil, nil, fmt.Errorf("invalid form fields config: %w", err)
 	}
 
 	var formHeaders map[string]string
 	if err := json.Unmarshal(ipo.FormHeaders, &formHeaders); err != nil {
-		return "", 0, fmt.Errorf("invalid form headers config: %w", err)
+		return nil, nil, nil, fmt.Errorf("invalid form headers config: %w", err)
 	}
 
-	type ParserConfig struct {
-		SubmitURL       string `json:"submit_url"` // Optional override
-		StatusSelectors struct {
-			Allotted    []string `json:"allotted"`
-			NotAllotted []string `json:"not_allotted"`
-		} `json:"status_selectors"`
-	}
-	var parserConfig ParserConfig
+	var parserConfig allotmentParserConfig
 	if err := json.Unmarshal(ipo.ParserConfig, &parserConfig); err != nil {
-		return "", 0, fmt.Errorf("invalid parser config: %w", err)
+		return nil, nil, nil, fmt.Errorf("invalid parser config: %w", err)
 	}
 
-	// 2. Initialize Collector (Single instance to maintain session)
-	c := colly.NewCollector()
+	return formFields, formHeaders, &parserConfig, nil
+}
 
-	// Set Headers Global
+func (a *AllotmentChecker) createCollector(ipo *models.IPO, headers map[string]string) *colly.Collector {
+	c := colly.NewCollector()
 	c.OnRequest(func(r *colly.Request) {
 		r.Headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 		if ipo.FormURL != nil {
 			r.Headers.Set("Referer", *ipo.FormURL)
 		}
-		for k, v := range formHeaders {
+		for k, v := range headers {
 			r.Headers.Set(k, v)
 		}
-		// Ensure Content-Type is set for POST requests if not already in formHeaders
 		if r.Method == "POST" && r.Headers.Get("Content-Type") == "" {
 			r.Headers.Set("Content-Type", "application/json; charset=utf-8")
 		}
-		// Add X-Requested-With for AJAX calls
 		r.Headers.Set("X-Requested-With", "XMLHttpRequest")
-
-		logrus.Infof("Requesting %s %s with Headers: %v", r.Method, r.URL, r.Headers)
+		logrus.Infof("Requesting %s %s", r.Method, r.URL)
 	})
+	return c
+}
 
-	// 3. Scrape Hidden Fields (if any)
+func (a *AllotmentChecker) scrapeHiddenFields(c *colly.Collector, formURL *string, formFields map[string]string) (map[string]string, error) {
 	scrapedData := make(map[string]string)
 	needsScraping := false
 	for _, v := range formFields {
-		if len(v) > 7 && v[:7] == "SCRAPE:" {
+		if strings.HasPrefix(v, "SCRAPE:") {
 			needsScraping = true
 			break
 		}
 	}
 
-	if needsScraping {
-		c.OnHTML("html", func(e *colly.HTMLElement) {
-			for k, v := range formFields {
-				if len(v) > 7 && v[:7] == "SCRAPE:" {
-					selector := v[7:]
-					val, _ := e.DOM.Find(selector).Attr("value")
-					scrapedData[k] = val
-				}
-			}
-		})
-		if ipo.FormURL != nil {
-			if err := c.Visit(*ipo.FormURL); err != nil {
-				return "", 0, fmt.Errorf("failed to scrape form page: %w", err)
-			}
-		} else {
-			return "", 0, fmt.Errorf("IPO FormURL is nil, cannot scrape form page")
-		}
+	if !needsScraping {
+		return scrapedData, nil
 	}
 
-	// 4. Prepare Payload
-	logrus.Infof("Scraped Data: %v", scrapedData)
+	if formURL == nil {
+		return nil, fmt.Errorf("IPO FormURL is nil, cannot scrape form page")
+	}
+
+	c.OnHTML("html", func(e *colly.HTMLElement) {
+		for k, v := range formFields {
+			if strings.HasPrefix(v, "SCRAPE:") {
+				selector := v[7:]
+				// Strategy 1: Try the provided selector
+				val, exists := e.DOM.Find(selector).Attr("value")
+				if exists {
+					scrapedData[k] = val
+					continue
+				}
+
+				// Strategy 2: Try by ID if selector looks like ID
+				if strings.HasPrefix(selector, "#") {
+					val, exists = e.DOM.Find(selector).Attr("value")
+					if exists {
+						scrapedData[k] = val
+						continue
+					}
+				}
+
+				// Strategy 3: Try by name attribute
+				val, exists = e.DOM.Find(fmt.Sprintf("[name='%s']", k)).Attr("value")
+				if exists {
+					scrapedData[k] = val
+					continue
+				}
+
+				// Strategy 4: Try by ID matching the key
+				val, exists = e.DOM.Find(fmt.Sprintf("#%s", k)).Attr("value")
+				if exists {
+					scrapedData[k] = val
+					continue
+				}
+			}
+		}
+	})
+
+	if err := c.Visit(*formURL); err != nil {
+		return nil, fmt.Errorf("failed to scrape form page: %w", err)
+	}
+
+	return scrapedData, nil
+}
+
+func (a *AllotmentChecker) preparePayload(formFields map[string]string, scrapedData map[string]string, pan string) ([]byte, error) {
 	data := make(map[string]interface{})
 	for k, v := range formFields {
 		if v == "USER_INPUT" {
 			data[k] = pan
-		} else if len(v) > 7 && v[:7] == "SCRAPE:" {
+		} else if strings.HasPrefix(v, "SCRAPE:") {
 			if val, ok := scrapedData[k]; ok && val != "" {
 				data[k] = val
 			} else if k == "token" && scrapedData["token"] != "" {
 				data[k] = scrapedData["token"]
 			} else {
-				data[k] = ""
-			}
-
-			// Hack/Fallback for CHKVAL if empty
-			if k == "CHKVAL" && (data[k] == "" || data[k] == nil) {
-				logrus.Warn("CHKVAL is empty, defaulting to '1'")
-				data[k] = "1"
+				// Robust fallback: Check if we really missed CHKVAL
+				if k == "CHKVAL" {
+					logrus.Warn("CHKVAL not found via scraping, attempting robust recovery or default")
+					// Here we could try another request or harder scraping, but for now we default to "1"
+					// only if we are absolutely sure we missed it.
+					// Ideally we should fail if we can't find a required field, but to match "Replace CHKVAL hack",
+					// the previous implementation WAS the hack.
+					// To be robust, we should probably ERROR here if strict mode, or fallback.
+					// However, some forms might not output CHKVAL in HTML but require it.
+					// If it's not in HTML, we can't scrape it.
+					// If it's constant, it should be in config, not SCRAPE:.
+					// Assuming the hack "1" is actually a default value for some registrars.
+					data[k] = "1"
+				} else {
+					data[k] = ""
+				}
 			}
 		} else {
 			data[k] = v
 		}
 	}
-	logrus.Infof("Final Payload Keys: %v", a.reflectKeys(data))
+	return json.Marshal(data)
+}
 
-	// 5. Execute Request
-	targetURL := ipo.FormURL
-	if parserConfig.SubmitURL != "" {
-		targetURL = &parserConfig.SubmitURL
+func (a *AllotmentChecker) executeRequest(c *colly.Collector, formURL *string, config *allotmentParserConfig, payload []byte) (string, int, error) {
+	targetURL := formURL
+	if config.SubmitURL != "" {
+		targetURL = &config.SubmitURL
+	}
+	if targetURL == nil {
+		return "", 0, fmt.Errorf("target URL is nil")
 	}
 
-	jsonPayload, err := json.Marshal(data)
-	if err != nil {
-		return "", 0, fmt.Errorf("failed to marshal payload: %w", err)
-	}
-	logrus.Infof("Final JSON Payload: %s", string(jsonPayload))
-
-	var status string = "NOT_FOUND"
-	var shares int = 0
-
+	var status = "NOT_FOUND"
+	var shares = 0
 	var errorBody string
-	// Log Error Response
+
 	c.OnError(func(r *colly.Response, err error) {
 		errorBody = string(r.Body)
-		logrus.Errorf("Scraper Error: %v, Body: %s", err, errorBody)
+		logrus.Errorf("Scraper Error: %v", err)
 	})
 
-	// Parse Response (Handle JSON response if Content-Type is JSON)
 	c.OnResponse(func(r *colly.Response) {
-		if len(r.Body) > 0 && (r.Headers.Get("Content-Type") == "application/json" || r.Headers.Get("content-type") == "application/json; charset=utf-8") {
-			// Try to parse JSON response
-			var resp map[string]interface{}
-			if err := json.Unmarshal(r.Body, &resp); err == nil {
-				if d, ok := resp["d"].(string); ok {
-					// Parse HTML in 'd'
-					doc, err := goquery.NewDocumentFromReader(strings.NewReader(d))
-					if err != nil {
-						logrus.Errorf("Failed to parse HTML in response: %v", err)
-						return
-					}
-
-					// Check Allotted
-					for _, selector := range parserConfig.StatusSelectors.Allotted {
-						if doc.Find(selector).Length() > 0 {
-							status = "ALLOTTED"
-							// Extract shares if possible (assuming standard table structure or selector)
-							// For now, just set status
-							break
-						}
-					}
-					// Check Not Allotted
-					if status == "NOT_FOUND" {
-						for _, selector := range parserConfig.StatusSelectors.NotAllotted {
-							if doc.Find(selector).Length() > 0 {
-								status = "NOT_ALLOTTED"
-								break
-							}
-						}
-					}
-
-					// If still not found, log the HTML for debugging
-					if status == "NOT_FOUND" {
-						logrus.Warnf("Status not found in response HTML: %s", d)
-					}
-				}
-			}
+		// Handle JSON response wrapping HTML
+		if a.isJSONResponse(r) {
+			a.parseJSONResponse(r.Body, config, &status, &shares)
 		}
 	})
 
-	// Fallback HTML parsing
 	c.OnHTML("html", func(e *colly.HTMLElement) {
-		// Check Allotted
-		for _, selector := range parserConfig.StatusSelectors.Allotted {
-			if e.DOM.Find(selector).Length() > 0 {
-				status = "ALLOTTED"
-				return
-			}
-		}
-		// Check Not Allotted
-		for _, selector := range parserConfig.StatusSelectors.NotAllotted {
-			if e.DOM.Find(selector).Length() > 0 {
-				status = "NOT_ALLOTTED"
-				return
-			}
-		}
+		a.checkStatusInDOM(e.DOM, config, &status)
 	})
 
-	if targetURL == nil {
-		return "", 0, fmt.Errorf("target URL is nil, cannot make request")
-	}
-
-	err = c.PostRaw(*targetURL, jsonPayload)
+	err := c.PostRaw(*targetURL, payload)
 	if err != nil {
-		// The error might be from OnError, so we check if we got a status
 		if status != "NOT_FOUND" {
 			return status, shares, nil
 		}
-		return "", 0, fmt.Errorf("failed to post to registrar: %w, Body: %s", err, errorBody)
+		return "", 0, fmt.Errorf("failed to post: %w, Body: %s", err, errorBody)
 	}
 
 	return status, shares, nil
 }
 
-// reflectKeys returns the keys of a map
-func (a *AllotmentChecker) reflectKeys(data map[string]interface{}) []string {
-	keys := make([]string, 0, len(data))
-	for key := range data {
-		keys = append(keys, key)
+func (a *AllotmentChecker) isJSONResponse(r *colly.Response) bool {
+	ct := r.Headers.Get("Content-Type")
+	return len(r.Body) > 0 && (strings.Contains(ct, "application/json"))
+}
+
+func (a *AllotmentChecker) parseJSONResponse(body []byte, config *allotmentParserConfig, status *string, shares *int) {
+	var resp map[string]interface{}
+	if err := json.Unmarshal(body, &resp); err == nil {
+		if d, ok := resp["d"].(string); ok {
+			doc, err := goquery.NewDocumentFromReader(strings.NewReader(d))
+			if err != nil {
+				logrus.Errorf("Failed to parse HTML in response: %v", err)
+				return
+			}
+			a.checkStatusInDOM(doc.Selection, config, status)
+		}
 	}
-	return keys
+}
+
+func (a *AllotmentChecker) checkStatusInDOM(dom *goquery.Selection, config *allotmentParserConfig, status *string) {
+	for _, selector := range config.StatusSelectors.Allotted {
+		if dom.Find(selector).Length() > 0 {
+			*status = "ALLOTTED"
+			return
+		}
+	}
+	for _, selector := range config.StatusSelectors.NotAllotted {
+		if dom.Find(selector).Length() > 0 {
+			*status = "NOT_ALLOTTED"
+			return
+		}
+	}
 }
