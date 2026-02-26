@@ -82,9 +82,25 @@ All V2 responses follow a consistent envelope format:
 **Query Parameters:**
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `status` | string | No | `all` | Filter by status: `all`, `live`, `upcoming`, `closed`, `listed` |
+| `status` | string | No | `all` | Filter by status: `all`, `live`, `upcoming`, `closed`, `listed`, `active` |
 | `limit` | int | No | 50 | Number of items per page (max 200) |
 | `offset` | int | No | 0 | Number of items to skip |
+
+**Example Requests:**
+- Get all active IPOs:
+  `http://localhost:8080/api/v2/ipos/feed?status=active`
+- Get all live IPOs (open for subscription):
+  `http://localhost:8080/api/v2/ipos/feed?status=live`
+- Get upcoming IPOs:
+  `http://localhost:8080/api/v2/ipos/feed?status=upcoming`
+- Get closed IPOs (subscription closed, waiting for allotment/listing):
+  `http://localhost:8080/api/v2/ipos/feed?status=closed`
+- Get listed IPOs:
+  `http://localhost:8080/api/v2/ipos/feed?status=listed`
+- Get all IPOs:
+  `http://localhost:8080/api/v2/ipos/feed?status=all`
+- Paginated results (Page 2 with 10 items per page):
+  `http://localhost:8080/api/v2/ipos/feed?status=all&limit=10&offset=10`
 
 **Response:**
 ```json
@@ -138,6 +154,9 @@ curl -X GET "https://api.example.com/api/v2/ipos/feed?status=live&limit=20" \
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `id` | UUID | Yes | IPO unique identifier |
+
+**Example Request:**
+`http://localhost:8080/api/v2/ipos/550e8400-e29b-41d4-a716-446655440000`
 
 **Response:**
 ```json
@@ -262,6 +281,9 @@ curl -X POST "https://api.example.com/api/v2/allotment/check" \
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `ipo_id` | string | Yes | IPO identifier (UUID or stock_id) |
+
+**Example Request:**
+`http://localhost:8080/api/v2/gmp/history/550e8400-e29b-41d4-a716-446655440000/chart`
 
 **Response:**
 ```json
