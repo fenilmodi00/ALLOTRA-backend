@@ -131,7 +131,7 @@ CREATE INDEX idx_ipo_recent ON ipo_list(created_at DESC, status);
 -- IPO Grey Market Premium (GMP) data table
 CREATE TABLE ipo_gmp (
     id VARCHAR(100) PRIMARY KEY,
-    ipo_name VARCHAR(255) NOT NULL UNIQUE,
+    ipo_name VARCHAR(255) NOT NULL,
     ipo_id UUID,
     company_code VARCHAR(50) NOT NULL,
     ipo_price DECIMAL(10, 2) NOT NULL,
@@ -161,6 +161,7 @@ ALTER TABLE ipo_gmp
     ON DELETE SET NULL;
 
 -- Add constraints for GMP table
+ALTER TABLE ipo_gmp ADD CONSTRAINT uq_ipo_gmp_source UNIQUE (ipo_id, data_source);
 ALTER TABLE ipo_gmp ADD CONSTRAINT ipo_gmp_ipo_name_not_empty CHECK (ipo_name != '');
 ALTER TABLE ipo_gmp ADD CONSTRAINT ipo_gmp_company_code_not_empty CHECK (company_code != '');
 ALTER TABLE ipo_gmp ADD CONSTRAINT ipo_gmp_ipo_price_positive CHECK (ipo_price >= 0);
