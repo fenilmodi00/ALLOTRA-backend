@@ -10,22 +10,22 @@ import (
 )
 
 type GMPUpdateJob struct {
-	DB               *sql.DB
-	SimpleGMPService *services.SimpleGMPService
-	CacheService     *services.CacheService
-	ticker           *time.Ticker
-	stopChan         chan struct{}
-	stopOnce         sync.Once
-	stateMu          sync.Mutex
-	isRunning        bool
+	DB           *sql.DB
+	GMPService   *services.GMPService
+	CacheService *services.CacheService
+	ticker       *time.Ticker
+	stopChan     chan struct{}
+	stopOnce     sync.Once
+	stateMu      sync.Mutex
+	isRunning    bool
 }
 
 func NewGMPUpdateJob(db *sql.DB, cacheService *services.CacheService) *GMPUpdateJob {
 	return &GMPUpdateJob{
-		DB:               db,
-		SimpleGMPService: services.NewSimpleGMPService(db),
-		CacheService:     cacheService,
-		stopChan:         make(chan struct{}),
+		DB:           db,
+		GMPService:   services.NewGMPServiceWithDB(db),
+		CacheService: cacheService,
+		stopChan:     make(chan struct{}),
 	}
 }
 
@@ -88,10 +88,10 @@ func (j *GMPUpdateJob) Stop() {
 
 func (j *GMPUpdateJob) Run() {
 	startTime := time.Now()
-	logrus.Info("Running GMP Update Job with SimpleGMPService...")
+	logrus.Info("Running GMP Update Job with GMPService...")
 
-	// Fetch and save GMP data using the simple service (handles modern InvestorGain structure)
-	gmpData, err := j.SimpleGMPService.FetchAndSaveGMPData()
+	// Fetch and save GMP data using the enhanced service (handles modern InvestorGain structure)
+	gmpData, err := j.GMPService.FetchAndSaveGMPData()
 	if err != nil {
 		logrus.Errorf("GMP Update Job failed: error fetching GMP data: %v", err)
 		return
