@@ -257,25 +257,8 @@ func (s *GMPHistoryService) GetPriceHistoryByIPO(ipoID string, dateRange *models
 	var ipoName string
 
 	for rows.Next() {
-		var entry models.GMPPriceHistoryEntry
-		err := rows.Scan(
-			&entry.ID,
-			&entry.IPOID,
-			&entry.CompanyCode,
-			&entry.RecordDate,
-			&entry.IPOPrice,
-			&entry.GMPValue,
-			&entry.EstimatedListing,
-			&entry.ListingPercent,
-			&entry.EstimatedProfit,
-			&entry.SubscriptionStatus,
-			&entry.Sub2Sauda,
-			&entry.LastUpdated,
-			&entry.DataSource,
-			&entry.CreatedAt,
-			&entry.UpdatedAt,
-			&ipoName,
-		)
+		entry, name, err := s.scanPriceHistoryRow(rows)
+		ipoName = name
 		if err != nil {
 			s.logger.WithFields(logrus.Fields{
 				"ipo_id": ipoID,
@@ -322,11 +305,21 @@ func (s *GMPHistoryService) GetPriceHistoryByIPO(ipoID string, dateRange *models
 	}
 
 	// Add metadata
+	latestUpdatedAt := time.Now()
+	dataSource := "investorgain.com"
+	if len(entries) > 0 {
+		latestUpdatedAt = entries[0].UpdatedAt
+		if entries[0].DataSource != "" {
+			dataSource = entries[0].DataSource
+		}
+	}
+
 	collection.Metadata = &models.CollectionMetadata{
-		LastScraped:     time.Now(),
-		DataSource:      "investorgain.com",
+		LastScraped:     latestUpdatedAt,
+		DataSource:      dataSource,
 		ScrapingSuccess: true,
 		ErrorCount:      0,
+		ProcessingTime:  time.Since(startTime).String(),
 	}
 
 	// Cache the result (Requirement 7.2)
@@ -340,6 +333,31 @@ func (s *GMPHistoryService) GetPriceHistoryByIPO(ipoID string, dateRange *models
 	}).Info("Price history retrieved successfully and cached")
 
 	return collection, nil
+}
+
+// scanPriceHistoryRow helper method to scan a single row into GMPPriceHistoryEntry
+func (s *GMPHistoryService) scanPriceHistoryRow(rows *sql.Rows) (models.GMPPriceHistoryEntry, string, error) {
+	var entry models.GMPPriceHistoryEntry
+	var ipoName string
+	err := rows.Scan(
+		&entry.ID,
+		&entry.IPOID,
+		&entry.CompanyCode,
+		&entry.RecordDate,
+		&entry.IPOPrice,
+		&entry.GMPValue,
+		&entry.EstimatedListing,
+		&entry.ListingPercent,
+		&entry.EstimatedProfit,
+		&entry.SubscriptionStatus,
+		&entry.Sub2Sauda,
+		&entry.LastUpdated,
+		&entry.DataSource,
+		&entry.CreatedAt,
+		&entry.UpdatedAt,
+		&ipoName,
+	)
+	return entry, ipoName, err
 }
 
 // ValidateHistoryData validates a price history entry against business rules
@@ -1089,28 +1107,129 @@ func (s *GMPHistoryService) WarmupCache(ctx context.Context) error {
 
 	s.logger.WithField("ipo_count", len(ipos)).Info("Found popular IPOs for cache warmup")
 
-	// Pre-load price history for each popular IPO
+	// Pre-load price history for each popular IPO (Optimized bulk fetch)
 	successCount := 0
 	errorCount := 0
 
-	for _, ipo := range ipos {
-		// Get price history (this will cache it)
-		_, err := s.GetPriceHistoryByIPO(ipo.ID, nil)
+	if len(ipos) > 0 {
+		ipoIDs := make([]string, 0, len(ipos))
+		for _, ipo := range ipos {
+			ipoIDs = append(ipoIDs, ipo.ID)
+		}
+
+		// Build bulk query placeholders
+		placeholders := make([]string, len(ipoIDs))
+		args := make([]interface{}, len(ipoIDs))
+		for i, id := range ipoIDs {
+			placeholders[i] = fmt.Sprintf("$%d", i+1)
+			args[i] = id
+		}
+
+		bulkQuery := fmt.Sprintf(`
+			SELECT
+				h.id, h.ipo_id, h.company_code, h.record_date, h.ipo_price, h.gmp_value,
+				h.estimated_listing, h.listing_percent, h.estimated_profit,
+				h.subscription_status, h.sub2_sauda, h.last_updated, h.data_source,
+				h.created_at, h.updated_at,
+				i.name
+			FROM gmp_price_history h
+			JOIN ipo_list i ON i.id = h.ipo_id
+			WHERE h.ipo_id IN (%s)
+			ORDER BY h.record_date DESC
+		`, strings.Join(placeholders, ","))
+
+		historyRows, err := s.DB.QueryContext(ctx, bulkQuery, args...)
 		if err != nil {
+			s.logger.WithError(err).Error("Failed to bulk fetch price histories during warmup")
+			return fmt.Errorf("failed to bulk fetch price histories: %w", err)
+		}
+		defer historyRows.Close()
+
+		// Group entries by IPO ID
+		historyMap := make(map[string][]models.GMPPriceHistoryEntry)
+		companyCodesMap := make(map[string]string)
+
+		bulkStartTime := time.Now()
+		for historyRows.Next() {
+			entry, _, err := s.scanPriceHistoryRow(historyRows)
+			if err != nil {
+				s.logger.WithError(err).Error("Failed to scan history row during warmup")
+				continue
+			}
+			historyMap[entry.IPOID] = append(historyMap[entry.IPOID], entry)
+			if _, ok := companyCodesMap[entry.IPOID]; !ok {
+				companyCodesMap[entry.IPOID] = entry.CompanyCode
+			}
+		}
+		bulkDuration := time.Since(bulkStartTime)
+
+		// Calculate average processing time share for each IPO metadata
+		avgProcessingTime := "0s"
+		if len(historyMap) > 0 {
+			avgProcessingTime = (bulkDuration / time.Duration(len(historyMap))).String()
+		}
+
+		// Process and cache each IPO's history
+		for _, ipo := range ipos {
+			entries, found := historyMap[ipo.ID]
+			if !found || len(entries) == 0 {
+				s.logger.WithFields(logrus.Fields{
+					"ipo_id":   ipo.ID,
+					"ipo_name": ipo.Name,
+					"error":    "no price history found",
+				}).Warn("Failed to warmup cache for IPO")
+				errorCount++
+				continue
+			}
+
+			collection := &models.GMPPriceHistoryCollection{
+				IPOID:        ipo.ID,
+				IPOName:      ipo.Name,
+				CompanyCode:  companyCodesMap[ipo.ID],
+				TotalRecords: len(entries),
+				Entries:      entries,
+			}
+
+			// Calculate date range and derive metadata from entries
+			var latestUpdatedAt time.Time
+			dataSource := "investorgain.com"
+
+			if len(entries) > 0 {
+				// Entries are ordered DESC, so first is latest, last is earliest
+				collection.DateRange = &models.DateRange{
+					StartDate: entries[len(entries)-1].RecordDate,
+					EndDate:   entries[0].RecordDate,
+				}
+
+				// Use the latest UpdatedAt for LastScraped
+				latestUpdatedAt = entries[0].UpdatedAt
+				if entries[0].DataSource != "" {
+					dataSource = entries[0].DataSource
+				}
+			}
+
+			if latestUpdatedAt.IsZero() {
+				latestUpdatedAt = time.Now()
+			}
+
+			// Add metadata
+			collection.Metadata = &models.CollectionMetadata{
+				LastScraped:     latestUpdatedAt,
+				DataSource:      dataSource,
+				ScrapingSuccess: true,
+				ProcessingTime:  avgProcessingTime,
+			}
+
+			cacheKey := fmt.Sprintf("gmp_history:%s", ipo.ID)
+			// Use longer TTL for historical data (15 minutes) consistent with GetPriceHistoryByIPO
+			s.cache.SetWithTTL(cacheKey, collection, 15*time.Minute)
+			successCount++
+
 			s.logger.WithFields(logrus.Fields{
 				"ipo_id":   ipo.ID,
 				"ipo_name": ipo.Name,
-				"error":    err.Error(),
-			}).Warn("Failed to warmup cache for IPO")
-			errorCount++
-			continue
+			}).Debug("Cache warmed up for IPO")
 		}
-
-		successCount++
-		s.logger.WithFields(logrus.Fields{
-			"ipo_id":   ipo.ID,
-			"ipo_name": ipo.Name,
-		}).Debug("Cache warmed up for IPO")
 	}
 
 	duration := time.Since(startTime)
