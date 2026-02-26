@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/fenilmodi00/ipo-backend/models"
 	"github.com/fenilmodi00/ipo-backend/shared"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 )
 
@@ -31,7 +33,7 @@ var (
 )
 
 // NewGMPHistoryService creates a new GMP history service instance
-func NewGMPHistoryService(db *sql.DB) *GMPHistoryService {
+func NewGMPHistoryService(db *sql.DB, redisClient *redis.Client) *GMPHistoryService {
 	logger := logrus.New()
 
 	var resilienceQueue *DBResilienceQueue
@@ -40,7 +42,7 @@ func NewGMPHistoryService(db *sql.DB) *GMPHistoryService {
 		resilienceQueue.Start()
 	}
 
-	cache := NewCacheServiceWithConfig(db, 10*time.Minute, 500)
+	cache := NewCacheServiceWithConfig(db, redisClient, 10*time.Minute, 500)
 
 	scraper := NewGMPPriceHistoryScraper(db)
 
@@ -271,14 +273,15 @@ func (s *GMPHistoryService) GetPriceHistoryByIPO(ipoID string, dateRange *models
 	}
 
 	// Try to get from cache first (Requirement 7.2)
-	if cached, found := s.cache.Get(cacheKey); found {
-		if history, ok := cached.(*models.GMPPriceHistoryCollection); ok {
+	if raw, found := s.cache.GetRaw(cacheKey); found {
+		var history models.GMPPriceHistoryCollection
+		if err := json.Unmarshal([]byte(raw), &history); err == nil {
 			s.logger.WithFields(logrus.Fields{
 				"ipo_id":    ipoID,
 				"cache_key": cacheKey,
 				"cache_hit": true,
 			}).Debug("Price history retrieved from cache")
-			return history, nil
+			return &history, nil
 		}
 	}
 
@@ -1369,7 +1372,7 @@ func (s *GMPHistoryService) GetCacheStats() map[string]interface{} {
 	return map[string]interface{}{
 		"enabled": true,
 		"size":    s.cache.Size(),
-		"type":    "in-memory",
+		"type":    "redis",
 	}
 }
 

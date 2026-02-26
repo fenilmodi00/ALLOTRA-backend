@@ -20,7 +20,7 @@ func TestGMPConsistencyBetweenEndpoints(t *testing.T) {
 		t.Skip("Database not available for integration testing")
 	}
 
-	gmpHistoryService := services.NewGMPHistoryService(db)
+	gmpHistoryService := services.NewGMPHistoryService(db, nil)
 	gmpHistoryHandler := handlers.NewGMPHistoryHandler(gmpHistoryService)
 
 	app := fiber.New()
@@ -54,7 +54,7 @@ func TestGMPChartDataHasCurrentGMP(t *testing.T) {
 		t.Skip("Database not available for integration testing")
 	}
 
-	gmpHistoryService := services.NewGMPHistoryService(db)
+	gmpHistoryService := services.NewGMPHistoryService(db, nil)
 	gmpHistoryHandler := handlers.NewGMPHistoryHandler(gmpHistoryService)
 
 	app := fiber.New()

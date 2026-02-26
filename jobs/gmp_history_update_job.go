@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/fenilmodi00/ipo-backend/services"
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 )
 
@@ -58,15 +59,15 @@ type JobMetrics struct {
 
 // NewGMPHistoryUpdateJob creates a new GMP history update job instance
 // Default execution interval is 4 hours as per Requirement 4.1
-func NewGMPHistoryUpdateJob(db *sql.DB) *GMPHistoryUpdateJob {
-	service := services.NewGMPHistoryService(db)
-	return NewGMPHistoryUpdateJobWithService(db, service)
+func NewGMPHistoryUpdateJob(db *sql.DB, redisClient *redis.Client) *GMPHistoryUpdateJob {
+	service := services.NewGMPHistoryService(db, redisClient)
+	return NewGMPHistoryUpdateJobWithService(db, redisClient, service)
 }
 
 // NewGMPHistoryUpdateJobWithService creates a job with an injected service instance.
-func NewGMPHistoryUpdateJobWithService(db *sql.DB, service *services.GMPHistoryService) *GMPHistoryUpdateJob {
+func NewGMPHistoryUpdateJobWithService(db *sql.DB, redisClient *redis.Client, service *services.GMPHistoryService) *GMPHistoryUpdateJob {
 	if service == nil {
-		service = services.NewGMPHistoryService(db)
+		service = services.NewGMPHistoryService(db, redisClient)
 	}
 
 	logger := logrus.New()
@@ -84,8 +85,8 @@ func NewGMPHistoryUpdateJobWithService(db *sql.DB, service *services.GMPHistoryS
 
 // NewGMPHistoryUpdateJobWithInterval creates a job with a custom execution interval
 // Useful for testing or custom deployment configurations
-func NewGMPHistoryUpdateJobWithInterval(db *sql.DB, interval time.Duration) *GMPHistoryUpdateJob {
-	service := services.NewGMPHistoryService(db)
+func NewGMPHistoryUpdateJobWithInterval(db *sql.DB, redisClient *redis.Client, interval time.Duration) *GMPHistoryUpdateJob {
+	service := services.NewGMPHistoryService(db, redisClient)
 	logger := logrus.New()
 
 	return &GMPHistoryUpdateJob{

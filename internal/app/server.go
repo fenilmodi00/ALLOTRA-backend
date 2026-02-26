@@ -21,6 +21,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	fiberrecover "github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 )
 
@@ -54,6 +55,19 @@ func Run(cfg *config.Config) error {
 		logrus.WithError(err).Error("Goose migrations failed, continuing with existing schema")
 	}
 
+	redisOpt, err := redis.ParseURL(cfg.RedisURL)
+	if err != nil {
+		return fmt.Errorf("failed to parse REDIS_URL: %w", err)
+	}
+	redisClient := redis.NewClient(redisOpt)
+	defer redisClient.Close()
+
+	if err := redisClient.Ping(context.Background()).Err(); err != nil {
+		logrus.WithError(err).Warn("Redis ping failed, cache operations may fail")
+	} else {
+		logrus.Info("Redis connected successfully")
+	}
+
 	cacheConfig := config.DefaultCacheConfig()
 	if cfg.CacheTTLHours != "" {
 		cacheConfig.DefaultTTL = cfg.GetCacheTTL()
@@ -66,6 +80,7 @@ func Run(cfg *config.Config) error {
 
 	cacheService := services.NewCacheServiceWithConfig(
 		db,
+		redisClient,
 		cacheConfig.DefaultTTL,
 		cacheConfig.MaxSize,
 	)
@@ -78,10 +93,10 @@ func Run(cfg *config.Config) error {
 
 	dailyJob := jobs.NewDailyIPOUpdateJob(scrapingService, growwScraper, growwMapper, ipoService, utilityService)
 	resultJob := jobs.NewResultReleaseCheckJob(ipoService)
-	cleanupJob := jobs.NewCacheCleanupJob(cacheService)
+	cleanupJob := jobs.NewCacheCleanupJob()
 	gmpJob := jobs.NewGMPUpdateJob(db, cacheService, cfg.InvestorGainURL)
-	gmpHistoryService := services.NewGMPHistoryService(db)
-	gmpHistoryJob := jobs.NewGMPHistoryUpdateJobWithService(db, gmpHistoryService)
+	gmpHistoryService := services.NewGMPHistoryService(db, redisClient)
+	gmpHistoryJob := jobs.NewGMPHistoryUpdateJobWithService(db, redisClient, gmpHistoryService)
 
 	ipoHandler := handlers.NewIPOHandler(ipoService)
 	cacheHandler := handlers.NewCacheHandler(cacheService)
@@ -122,7 +137,7 @@ func Run(cfg *config.Config) error {
 
 	app := fiber.New(fiber.Config{BodyLimit: 4 * 1024 * 1024})
 	registerMiddleware(app, cfg)
-	registerRoutes(app, db, cfg, ipoHandler, cacheHandler, adminHandler, checkHandler, marketHandler, gmpHandler, gmpHistoryHandler, performanceHandler, ipoService, allotmentChecker, cacheService)
+	registerRoutes(app, db, cfg, redisClient, ipoHandler, cacheHandler, adminHandler, checkHandler, marketHandler, gmpHandler, gmpHistoryHandler, performanceHandler, ipoService, allotmentChecker, cacheService)
 
 	serverErrors := make(chan error, 1)
 	go func() {
@@ -182,6 +197,7 @@ func registerRoutes(
 	app *fiber.App,
 	db *sql.DB,
 	cfg *config.Config,
+	redisClient *redis.Client,
 	ipoHandler *handlers.IPOHandler,
 	cacheHandler *handlers.CacheHandler,
 	adminHandler *handlers.AdminHandler,
@@ -207,6 +223,14 @@ func registerRoutes(
 			status = "degraded"
 			statusCode = fiber.StatusServiceUnavailable
 			details["database"] = dbErr.Error()
+		}
+
+		redisErr := redisClient.Ping(pingCtx).Err()
+		if redisErr != nil {
+			status = "degraded"
+			details["redis"] = redisErr.Error()
+		} else {
+			details["redis"] = "ok"
 		}
 
 		return c.Status(statusCode).JSON(fiber.Map{
@@ -349,6 +373,7 @@ func logServiceConfiguration(cacheTTL time.Duration, cacheMaxSize int) {
 	logrus.Printf("  - Unified cache service (TTL: %v, max size: %d)", cacheTTL, cacheMaxSize)
 	logrus.Println("  - Utility service (text processing and normalization)")
 	logrus.Println("  - Simplified IPO service (lifecycle analyzer removed)")
+	logrus.Println("  - Redis cache backend configured")
 }
 
 func startBackgroundJobs(

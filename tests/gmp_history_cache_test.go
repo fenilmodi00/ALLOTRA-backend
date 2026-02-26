@@ -11,7 +11,7 @@ import (
 // TestGMPHistoryCacheIntegration tests the complete caching workflow
 func TestGMPHistoryCacheIntegration(t *testing.T) {
 	// Create service with cache
-	service := services.NewGMPHistoryService(nil)
+	service := services.NewGMPHistoryService(nil, nil)
 
 	// Verify cache is initialized
 	stats := service.GetCacheStats()
@@ -29,7 +29,7 @@ func TestGMPHistoryCacheIntegration(t *testing.T) {
 
 // TestCacheInvalidationWorkflow tests the cache invalidation workflow
 func TestCacheInvalidationWorkflow(t *testing.T) {
-	service := services.NewGMPHistoryService(nil)
+	service := services.NewGMPHistoryService(nil, nil)
 
 	testIPOID := "test-ipo-cache-123"
 
@@ -50,7 +50,7 @@ func TestCacheInvalidationWorkflow(t *testing.T) {
 
 // TestCacheWarmupConcept tests the cache warmup concept
 func TestCacheWarmupConcept(t *testing.T) {
-	service := services.NewGMPHistoryService(nil)
+	service := services.NewGMPHistoryService(nil, nil)
 
 	// Test that warmup method exists and can be called
 	// Note: Without a database, we can't actually warm up the cache,
@@ -70,7 +70,7 @@ func TestCacheWarmupConcept(t *testing.T) {
 // TestCachePerformanceRequirement tests that cache meets performance requirements
 // Requirement 7.1: API should respond within 500ms for datasets up to 1000 records
 func TestCachePerformanceRequirement(t *testing.T) {
-	service := services.NewGMPHistoryService(nil)
+	service := services.NewGMPHistoryService(nil, nil)
 
 	// Note: We can't directly test cache retrieval speed without database access,
 	// but we can verify the cache service is configured correctly
@@ -92,7 +92,7 @@ func TestCachePerformanceRequirement(t *testing.T) {
 // TestCacheTTLConfiguration tests that cache TTL is properly configured
 // Requirement 7.2: Maintain response times through caching strategies
 func TestCacheTTLConfiguration(t *testing.T) {
-	service := services.NewGMPHistoryService(nil)
+	service := services.NewGMPHistoryService(nil, nil)
 
 	// Verify cache is initialized with appropriate TTL
 	// The service initializes cache with 10 minute default TTL
@@ -103,10 +103,10 @@ func TestCacheTTLConfiguration(t *testing.T) {
 		t.Fatal("Expected cache stats")
 	}
 
-	// Verify cache type is in-memory (fast access)
+	// Verify cache type is redis (fast access)
 	cacheType, ok := stats["type"].(string)
-	if !ok || cacheType != "in-memory" {
-		t.Error("Expected in-memory cache for optimal performance")
+	if !ok || cacheType != "redis" {
+		t.Error("Expected redis cache for optimal performance")
 	}
 
 	t.Log("Cache TTL configuration: Cache is configured with appropriate TTL for performance")
@@ -114,7 +114,7 @@ func TestCacheTTLConfiguration(t *testing.T) {
 
 // TestCacheInvalidationOnDataUpdate tests cache invalidation when data is updated
 func TestCacheInvalidationOnDataUpdate(t *testing.T) {
-	service := services.NewGMPHistoryService(nil)
+	service := services.NewGMPHistoryService(nil, nil)
 
 	testIPOID := "test-ipo-update"
 
@@ -137,7 +137,7 @@ func TestCacheInvalidationOnDataUpdate(t *testing.T) {
 
 // TestMultipleIPOsCaching tests caching for multiple IPOs simultaneously
 func TestMultipleIPOsCaching(t *testing.T) {
-	service := services.NewGMPHistoryService(nil)
+	service := services.NewGMPHistoryService(nil, nil)
 
 	// Simulate caching multiple IPOs
 	ipoIDs := []string{"ipo-1", "ipo-2", "ipo-3", "ipo-4", "ipo-5"}

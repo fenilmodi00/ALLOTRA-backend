@@ -3,159 +3,120 @@ package services
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/fenilmodi00/ipo-backend/models"
+	"github.com/redis/go-redis/v9"
+	"github.com/sirupsen/logrus"
 )
 
-// CacheEntry represents a cached item with expiration
-type CacheEntry struct {
-	Data      interface{}
-	ExpiresAt time.Time
-}
-
-// IsExpired checks if the cache entry has expired
-func (ce *CacheEntry) IsExpired() bool {
-	return time.Now().After(ce.ExpiresAt)
-}
-
-// CacheService provides unified caching solution with both in-memory and database persistence.
-// This consolidated service eliminates the need for separate memory and database cache implementations.
-// It supports:
-// - In-memory caching with TTL and automatic cleanup
-// - Database persistence for IPO results
-// - Thread-safe operations with read/write locks
-// - Configurable TTL for different cache types
+// CacheService provides unified caching solution with Redis and database persistence.
+// Redis handles TTL expiration and eviction natively, replacing the previous in-memory map.
 type CacheService struct {
-	cache      map[string]*CacheEntry
-	mutex      sync.RWMutex
-	defaultTTL time.Duration
-	maxSize    int
-	DB         *sql.DB // Database for persistent caching
+	redisClient *redis.Client
+	defaultTTL  time.Duration
+	DB          *sql.DB
 }
 
-// NewCacheService creates a new consolidated cache service with default TTL.
-// This replaces the need for separate memory and database cache services.
-func NewCacheService(db *sql.DB) *CacheService {
-	cs := &CacheService{
-		cache:      make(map[string]*CacheEntry),
-		defaultTTL: 5 * time.Minute, // Default 5 minute TTL
-		maxSize:    1000,            // Default max size
-		DB:         db,
+// NewCacheService creates a new cache service backed by Redis with default settings.
+func NewCacheService(db *sql.DB, redisClient *redis.Client) *CacheService {
+	return &CacheService{
+		redisClient: redisClient,
+		defaultTTL:  5 * time.Minute,
+		DB:          db,
 	}
-
-	// Start cleanup goroutine
-	go cs.cleanupExpired()
-
-	return cs
 }
 
-// NewCacheServiceWithConfig creates a cache service with custom configuration
-func NewCacheServiceWithConfig(db *sql.DB, defaultTTL time.Duration, maxSize int) *CacheService {
-	cs := &CacheService{
-		cache:      make(map[string]*CacheEntry),
-		defaultTTL: defaultTTL,
-		maxSize:    maxSize,
-		DB:         db,
+// NewCacheServiceWithConfig creates a cache service backed by Redis with custom configuration.
+func NewCacheServiceWithConfig(db *sql.DB, redisClient *redis.Client, defaultTTL time.Duration, maxSize int) *CacheService {
+	_ = maxSize // Redis handles eviction, parameter kept for API compatibility
+	return &CacheService{
+		redisClient: redisClient,
+		defaultTTL:  defaultTTL,
+		DB:          db,
 	}
-
-	// Start cleanup goroutine
-	go cs.cleanupExpired()
-
-	return cs
 }
 
-// Get retrieves a value from cache
-func (cs *CacheService) Get(key string) (interface{}, bool) {
-	cs.mutex.RLock()
-	defer cs.mutex.RUnlock()
-
-	entry, exists := cs.cache[key]
-	if !exists || entry.IsExpired() {
-		return nil, false
+// GetRaw retrieves a raw JSON string from Redis by key.
+// Returns ("", false) on redis.Nil or any error.
+// Returns ("", false) gracefully if redisClient is nil (for testing).
+func (cs *CacheService) GetRaw(key string) (string, bool) {
+	if cs.redisClient == nil {
+		return "", false
 	}
-
-	return entry.Data, true
+	ctx := context.Background()
+	val, err := cs.redisClient.Get(ctx, key).Result()
+	if err != nil {
+		if err != redis.Nil {
+			logrus.WithError(err).WithField("key", key).Error("Redis GET failed")
+		}
+		return "", false
+	}
+	return val, true
 }
 
-// Set stores a value in cache with default TTL
+// Set stores a value in Redis with the default TTL.
 func (cs *CacheService) Set(key string, value interface{}) {
 	cs.SetWithTTL(key, value, cs.defaultTTL)
 }
 
-// SetWithTTL stores a value in cache with custom TTL
+// SetWithTTL stores a value in Redis with a custom TTL.
+// The value is JSON-marshalled before storage.
+// No-op if redisClient is nil (for testing).
 func (cs *CacheService) SetWithTTL(key string, value interface{}, ttl time.Duration) {
-	cs.mutex.Lock()
-	defer cs.mutex.Unlock()
-
-	// Check if we're at max size and need to evict
-	if len(cs.cache) >= cs.maxSize {
-		cs.evictOldest()
+	if cs.redisClient == nil {
+		return
 	}
-
-	cs.cache[key] = &CacheEntry{
-		Data:      value,
-		ExpiresAt: time.Now().Add(ttl),
+	ctx := context.Background()
+	data, err := json.Marshal(value)
+	if err != nil {
+		logrus.WithError(err).WithField("key", key).Error("Failed to marshal cache value")
+		return
 	}
-}
-
-// evictOldest removes the oldest entry from cache (simple FIFO eviction)
-func (cs *CacheService) evictOldest() {
-	var oldestKey string
-	var oldestTime time.Time
-
-	for key, entry := range cs.cache {
-		if oldestKey == "" || entry.ExpiresAt.Before(oldestTime) {
-			oldestKey = key
-			oldestTime = entry.ExpiresAt
-		}
-	}
-
-	if oldestKey != "" {
-		delete(cs.cache, oldestKey)
+	if err := cs.redisClient.Set(ctx, key, string(data), ttl).Err(); err != nil {
+		logrus.WithError(err).WithField("key", key).Error("Redis SET failed")
 	}
 }
 
-// Delete removes a value from cache
+// Delete removes a value from Redis.
+// No-op if redisClient is nil (for testing).
 func (cs *CacheService) Delete(key string) {
-	cs.mutex.Lock()
-	defer cs.mutex.Unlock()
-
-	delete(cs.cache, key)
-}
-
-// Clear removes all values from cache
-func (cs *CacheService) Clear() {
-	cs.mutex.Lock()
-	defer cs.mutex.Unlock()
-
-	cs.cache = make(map[string]*CacheEntry)
-}
-
-// Size returns the number of items in cache
-func (cs *CacheService) Size() int {
-	cs.mutex.RLock()
-	defer cs.mutex.RUnlock()
-
-	return len(cs.cache)
-}
-
-// cleanupExpired removes expired entries from cache
-func (cs *CacheService) cleanupExpired() {
-	ticker := time.NewTicker(5 * time.Minute) // Cleanup every 5 minutes
-	defer ticker.Stop()
-
-	for range ticker.C {
-		cs.mutex.Lock()
-		for key, entry := range cs.cache {
-			if entry.IsExpired() {
-				delete(cs.cache, key)
-			}
-		}
-		cs.mutex.Unlock()
+	if cs.redisClient == nil {
+		return
 	}
+	ctx := context.Background()
+	if err := cs.redisClient.Del(ctx, key).Err(); err != nil {
+		logrus.WithError(err).WithField("key", key).Error("Redis DEL failed")
+	}
+}
+
+// Clear removes all keys in the current Redis database.
+// No-op if redisClient is nil (for testing).
+func (cs *CacheService) Clear() {
+	if cs.redisClient == nil {
+		return
+	}
+	ctx := context.Background()
+	if err := cs.redisClient.FlushDB(ctx).Err(); err != nil {
+		logrus.WithError(err).Error("Redis FLUSHDB failed")
+	}
+}
+
+// Size returns the number of keys in the current Redis database.
+// Returns 0 if redisClient is nil (for testing).
+func (cs *CacheService) Size() int {
+	if cs.redisClient == nil {
+		return 0
+	}
+	ctx := context.Background()
+	val, err := cs.redisClient.DBSize(ctx).Result()
+	if err != nil {
+		logrus.WithError(err).Error("Redis DBSIZE failed")
+		return 0
+	}
+	return int(val)
 }
 
 // CachedIPOService wraps IPOService with caching capabilities
@@ -177,10 +138,12 @@ func (cis *CachedIPOService) GetActiveIPOsWithGMP(ctx context.Context) ([]models
 	cacheKey := "active_ipos_with_gmp"
 
 	// Try to get from cache first
-	if cached, found := cis.cache.Get(cacheKey); found {
-		if ipos, ok := cached.([]models.IPOWithGMP); ok {
+	if raw, found := cis.cache.GetRaw(cacheKey); found {
+		var ipos []models.IPOWithGMP
+		if err := json.Unmarshal([]byte(raw), &ipos); err == nil {
 			return ipos, nil
 		}
+		logrus.WithField("key", cacheKey).Error("Failed to unmarshal cached value")
 	}
 
 	// Cache miss - fetch from database
@@ -200,10 +163,12 @@ func (cis *CachedIPOService) GetIPOByIDWithGMP(ctx context.Context, id string) (
 	cacheKey := fmt.Sprintf("ipo_with_gmp:%s", id)
 
 	// Try to get from cache first
-	if cached, found := cis.cache.Get(cacheKey); found {
-		if ipo, ok := cached.(*models.IPOWithGMP); ok {
-			return ipo, nil
+	if raw, found := cis.cache.GetRaw(cacheKey); found {
+		var ipo models.IPOWithGMP
+		if err := json.Unmarshal([]byte(raw), &ipo); err == nil {
+			return &ipo, nil
 		}
+		logrus.WithField("key", cacheKey).Error("Failed to unmarshal cached value")
 	}
 
 	// Cache miss - fetch from database
@@ -225,10 +190,12 @@ func (cis *CachedIPOService) GetActiveIPOs(ctx context.Context) ([]models.IPO, e
 	cacheKey := "active_ipos"
 
 	// Try to get from cache first
-	if cached, found := cis.cache.Get(cacheKey); found {
-		if ipos, ok := cached.([]models.IPO); ok {
+	if raw, found := cis.cache.GetRaw(cacheKey); found {
+		var ipos []models.IPO
+		if err := json.Unmarshal([]byte(raw), &ipos); err == nil {
 			return ipos, nil
 		}
+		logrus.WithField("key", cacheKey).Error("Failed to unmarshal cached value")
 	}
 
 	// Cache miss - fetch from database
@@ -248,10 +215,12 @@ func (cis *CachedIPOService) GetIPOs(ctx context.Context, status string) ([]mode
 	cacheKey := fmt.Sprintf("ipos:%s", status)
 
 	// Try to get from cache first
-	if cached, found := cis.cache.Get(cacheKey); found {
-		if ipos, ok := cached.([]models.IPO); ok {
+	if raw, found := cis.cache.GetRaw(cacheKey); found {
+		var ipos []models.IPO
+		if err := json.Unmarshal([]byte(raw), &ipos); err == nil {
 			return ipos, nil
 		}
+		logrus.WithField("key", cacheKey).Error("Failed to unmarshal cached value")
 	}
 
 	// Cache miss - fetch from database
@@ -271,10 +240,12 @@ func (cis *CachedIPOService) GetIPOByID(ctx context.Context, id string) (*models
 	cacheKey := fmt.Sprintf("ipo:%s", id)
 
 	// Try to get from cache first
-	if cached, found := cis.cache.Get(cacheKey); found {
-		if ipo, ok := cached.(*models.IPO); ok {
-			return ipo, nil
+	if raw, found := cis.cache.GetRaw(cacheKey); found {
+		var ipo models.IPO
+		if err := json.Unmarshal([]byte(raw), &ipo); err == nil {
+			return &ipo, nil
 		}
+		logrus.WithField("key", cacheKey).Error("Failed to unmarshal cached value")
 	}
 
 	// Cache miss - fetch from database
@@ -308,7 +279,6 @@ func (cis *CachedIPOService) InvalidateIPOCache(ipoID string) {
 
 // InvalidateAllIPOCache removes all IPO-related cache entries
 func (cis *CachedIPOService) InvalidateAllIPOCache() {
-	// This is a simple approach - in production, you might want to use cache tags
 	cis.cache.Clear()
 }
 
@@ -316,7 +286,7 @@ func (cis *CachedIPOService) InvalidateAllIPOCache() {
 func (cis *CachedIPOService) GetCacheStats() map[string]interface{} {
 	return map[string]interface{}{
 		"size": cis.cache.Size(),
-		"type": "in-memory",
+		"type": "redis",
 	}
 }
 
@@ -392,19 +362,4 @@ func (cs *CacheService) GetCachedResult(ctx context.Context, ipoID, panHash stri
 	}
 
 	return &result, nil
-}
-
-// CleanupExpiredDB removes expired cache entries from database
-func (cs *CacheService) CleanupExpiredDB(ctx context.Context) error {
-	query := `DELETE FROM ipo_result_cache WHERE expires_at < NOW()`
-
-	result, err := cs.DB.ExecContext(ctx, query)
-	if err != nil {
-		return err
-	}
-
-	rowsAffected, _ := result.RowsAffected()
-	fmt.Printf("Cleaned up %d expired database cache entries\n", rowsAffected)
-
-	return nil
 }

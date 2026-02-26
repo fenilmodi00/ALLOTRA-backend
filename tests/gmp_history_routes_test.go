@@ -22,7 +22,7 @@ func TestGMPHistoryRoutesRegistration(t *testing.T) {
 	}
 
 	// Initialize service and handler
-	gmpHistoryService := services.NewGMPHistoryService(db)
+	gmpHistoryService := services.NewGMPHistoryService(db, nil)
 	defer gmpHistoryService.Close()
 
 	gmpHistoryHandler := handlers.NewGMPHistoryHandler(gmpHistoryService)
@@ -106,7 +106,7 @@ func TestGMPHistoryRouteParameterValidation(t *testing.T) {
 	}
 
 	// Initialize service and handler
-	gmpHistoryService := services.NewGMPHistoryService(db)
+	gmpHistoryService := services.NewGMPHistoryService(db, nil)
 	defer gmpHistoryService.Close()
 
 	gmpHistoryHandler := handlers.NewGMPHistoryHandler(gmpHistoryService)
@@ -196,7 +196,7 @@ func TestGMPHistoryRouteIntegrationWithMiddleware(t *testing.T) {
 	}
 
 	// Initialize service and handler
-	gmpHistoryService := services.NewGMPHistoryService(db)
+	gmpHistoryService := services.NewGMPHistoryService(db, nil)
 	defer gmpHistoryService.Close()
 
 	gmpHistoryHandler := handlers.NewGMPHistoryHandler(gmpHistoryService)

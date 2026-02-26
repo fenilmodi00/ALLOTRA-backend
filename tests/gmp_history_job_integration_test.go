@@ -15,7 +15,7 @@ func TestGMPHistoryJobIntegration(t *testing.T) {
 
 	t.Run("Job can be initialized without database", func(t *testing.T) {
 		var db *sql.DB // nil database for initialization test
-		job := jobs.NewGMPHistoryUpdateJob(db)
+		job := jobs.NewGMPHistoryUpdateJob(db, nil)
 
 		if job == nil {
 			t.Fatal("Expected job to be initialized")
@@ -29,7 +29,7 @@ func TestGMPHistoryJobIntegration(t *testing.T) {
 
 	t.Run("Job can be stopped gracefully", func(t *testing.T) {
 		var db *sql.DB
-		job := jobs.NewGMPHistoryUpdateJob(db)
+		job := jobs.NewGMPHistoryUpdateJob(db, nil)
 
 		// Note: We don't actually start the job here because it would
 		// immediately try to run and access the nil database.
@@ -44,7 +44,7 @@ func TestGMPHistoryJobIntegration(t *testing.T) {
 
 	t.Run("Job status can be retrieved", func(t *testing.T) {
 		var db *sql.DB
-		job := jobs.NewGMPHistoryUpdateJob(db)
+		job := jobs.NewGMPHistoryUpdateJob(db, nil)
 
 		status := job.GetJobStatus()
 
@@ -77,7 +77,7 @@ func TestGMPHistoryJobIntegration(t *testing.T) {
 	t.Run("Job interval can be configured", func(t *testing.T) {
 		customInterval := 2 * time.Hour
 		var db *sql.DB
-		job := jobs.NewGMPHistoryUpdateJobWithInterval(db, customInterval)
+		job := jobs.NewGMPHistoryUpdateJobWithInterval(db, nil, customInterval)
 
 		if job.GetExecutionInterval() != customInterval {
 			t.Errorf("Expected custom interval %v, got %v", customInterval, job.GetExecutionInterval())
@@ -97,7 +97,7 @@ func TestGMPHistoryJobIntegration(t *testing.T) {
 func TestGMPHistoryJobScheduling(t *testing.T) {
 	t.Run("Next run time is calculated correctly", func(t *testing.T) {
 		var db *sql.DB
-		job := jobs.NewGMPHistoryUpdateJob(db)
+		job := jobs.NewGMPHistoryUpdateJob(db, nil)
 
 		nextRun := job.GetNextRunTime()
 		now := time.Now()
@@ -114,7 +114,7 @@ func TestGMPHistoryJobScheduling(t *testing.T) {
 
 	t.Run("Job tracks failed IPOs for retry", func(t *testing.T) {
 		var db *sql.DB
-		job := jobs.NewGMPHistoryUpdateJob(db)
+		job := jobs.NewGMPHistoryUpdateJob(db, nil)
 
 		// Initially should have no failed IPOs
 		if job.GetFailedIPOCount() != 0 {
@@ -133,7 +133,7 @@ func TestGMPHistoryJobScheduling(t *testing.T) {
 func TestGMPHistoryJobMetrics(t *testing.T) {
 	t.Run("Metrics are nil before first run", func(t *testing.T) {
 		var db *sql.DB
-		job := jobs.NewGMPHistoryUpdateJob(db)
+		job := jobs.NewGMPHistoryUpdateJob(db, nil)
 
 		metrics := job.GetLastRunMetrics()
 		if metrics != nil {
@@ -143,7 +143,7 @@ func TestGMPHistoryJobMetrics(t *testing.T) {
 
 	t.Run("Job status includes all required fields", func(t *testing.T) {
 		var db *sql.DB
-		job := jobs.NewGMPHistoryUpdateJob(db)
+		job := jobs.NewGMPHistoryUpdateJob(db, nil)
 
 		status := job.GetJobStatus()
 

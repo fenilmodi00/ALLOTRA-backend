@@ -15,7 +15,7 @@ import (
 // Validates Requirements 8.1, 8.3 - Route registration and parameter validation
 func TestGMPHistoryRoutesRegistrationUnit(t *testing.T) {
 	// Initialize service with nil database (for route registration test only)
-	gmpHistoryService := services.NewGMPHistoryService(nil)
+	gmpHistoryService := services.NewGMPHistoryService(nil, nil)
 	defer gmpHistoryService.Close()
 
 	gmpHistoryHandler := handlers.NewGMPHistoryHandler(gmpHistoryService)
@@ -60,7 +60,7 @@ func TestGMPHistoryRoutesRegistrationUnit(t *testing.T) {
 // Validates Requirements 8.1 - Proper parameter validation
 func TestGMPHistoryRouteParameterValidationUnit(t *testing.T) {
 	// Initialize service with nil database
-	gmpHistoryService := services.NewGMPHistoryService(nil)
+	gmpHistoryService := services.NewGMPHistoryService(nil, nil)
 	defer gmpHistoryService.Close()
 
 	gmpHistoryHandler := handlers.NewGMPHistoryHandler(gmpHistoryService)

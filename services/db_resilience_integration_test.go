@@ -82,7 +82,7 @@ func TestResilienceQueueWorkflow(t *testing.T) {
 func TestGMPHistoryServiceWithResilience(t *testing.T) {
 	// This test verifies that GMPHistoryService properly integrates the resilience queue
 	var db *sql.DB
-	service := NewGMPHistoryService(db)
+	service := NewGMPHistoryService(db, nil)
 
 	if service.resilienceQueue != nil {
 		t.Fatal("Expected resilience queue to remain disabled when database is nil")
@@ -244,7 +244,7 @@ func TestErrorIsolationInQueue(t *testing.T) {
 // TestServiceCleanup tests proper cleanup of resources
 func TestServiceCleanup(t *testing.T) {
 	var db *sql.DB
-	service := NewGMPHistoryService(db)
+	service := NewGMPHistoryService(db, nil)
 
 	if service.resilienceQueue != nil {
 		t.Fatal("Expected resilience queue to remain disabled when database is nil")

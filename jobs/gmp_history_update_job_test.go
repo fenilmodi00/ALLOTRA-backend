@@ -8,7 +8,7 @@ import (
 // TestGMPHistoryUpdateJobInitialization verifies the job can be created and configured
 func TestGMPHistoryUpdateJobInitialization(t *testing.T) {
 	// Test default initialization
-	job := NewGMPHistoryUpdateJob(nil)
+	job := NewGMPHistoryUpdateJob(nil, nil)
 
 	if job == nil {
 		t.Fatal("Expected job to be initialized, got nil")
@@ -34,7 +34,7 @@ func TestGMPHistoryUpdateJobInitialization(t *testing.T) {
 // TestGMPHistoryUpdateJobCustomInterval verifies custom interval configuration
 func TestGMPHistoryUpdateJobCustomInterval(t *testing.T) {
 	customInterval := 2 * time.Hour
-	job := NewGMPHistoryUpdateJobWithInterval(nil, customInterval)
+	job := NewGMPHistoryUpdateJobWithInterval(nil, nil, customInterval)
 
 	if job.ExecutionInterval != customInterval {
 		t.Errorf("Expected interval of %v, got %v", customInterval, job.ExecutionInterval)
@@ -43,7 +43,7 @@ func TestGMPHistoryUpdateJobCustomInterval(t *testing.T) {
 
 // TestGMPHistoryUpdateJobSetInterval verifies interval can be updated
 func TestGMPHistoryUpdateJobSetInterval(t *testing.T) {
-	job := NewGMPHistoryUpdateJob(nil)
+	job := NewGMPHistoryUpdateJob(nil, nil)
 
 	newInterval := 6 * time.Hour
 	job.SetExecutionInterval(newInterval)
@@ -55,7 +55,7 @@ func TestGMPHistoryUpdateJobSetInterval(t *testing.T) {
 
 // TestGMPHistoryUpdateJobGetters verifies getter methods work correctly
 func TestGMPHistoryUpdateJobGetters(t *testing.T) {
-	job := NewGMPHistoryUpdateJob(nil)
+	job := NewGMPHistoryUpdateJob(nil, nil)
 
 	// Test GetExecutionInterval
 	interval := job.GetExecutionInterval()
@@ -104,7 +104,7 @@ func TestGMPHistoryUpdateJobGetters(t *testing.T) {
 
 // TestGMPHistoryUpdateJobFailedIPOTracking verifies failed IPO tracking
 func TestGMPHistoryUpdateJobFailedIPOTracking(t *testing.T) {
-	job := NewGMPHistoryUpdateJob(nil)
+	job := NewGMPHistoryUpdateJob(nil, nil)
 
 	// Add a failed IPO
 	job.failedIPOs = append(job.failedIPOs, FailedIPO{

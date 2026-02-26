@@ -20,6 +20,7 @@ type Config struct {
 	InvestorGainURL    string
 	SupabaseURL        string
 	SupabaseServiceKey string
+	RedisURL           string
 }
 
 // SimplifiedRateLimitConfig holds simplified rate limiting configuration
@@ -82,6 +83,7 @@ func LoadConfig() *Config {
 		InvestorGainURL:    getEnv("INVESTOR_GAIN_URL", "https://www.investorgain.com/report/live-ipo-gmp/331/all/"),
 		SupabaseURL:        getEnv("SUPABASE_URL", ""),
 		SupabaseServiceKey: getEnv("SUPABASE_SERVICE_KEY", ""),
+		RedisURL:           getEnv("REDIS_URL", "rediss://default:Ae00000InST0oXh9uyB3C3vCgywuC0zUsOvFF5HMbxUPg+qV+x90cyhqd0ggSmTC1G/6WEr@Allotra-qooj-iccc-585068.leapcell.cloud:6379"),
 	}
 }
 

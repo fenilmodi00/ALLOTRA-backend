@@ -22,7 +22,7 @@ func TestCircuitBreakerIntegration(t *testing.T) {
 	}
 
 	// Create service
-	gmpHistoryService := services.NewGMPHistoryService(db)
+	gmpHistoryService := services.NewGMPHistoryService(db, nil)
 	defer gmpHistoryService.Close()
 
 	t.Run("Circuit breaker is initialized", func(t *testing.T) {
@@ -73,7 +73,7 @@ func TestHealthCheckEndpoint(t *testing.T) {
 	}
 
 	// Create service and handler
-	gmpHistoryService := services.NewGMPHistoryService(db)
+	gmpHistoryService := services.NewGMPHistoryService(db, nil)
 	defer gmpHistoryService.Close()
 
 	gmpHistoryHandler := handlers.NewGMPHistoryHandler(gmpHistoryService)
@@ -155,7 +155,7 @@ func TestServiceMetricsEndpoint(t *testing.T) {
 	}
 
 	// Create service and handler
-	gmpHistoryService := services.NewGMPHistoryService(db)
+	gmpHistoryService := services.NewGMPHistoryService(db, nil)
 	defer gmpHistoryService.Close()
 
 	gmpHistoryHandler := handlers.NewGMPHistoryHandler(gmpHistoryService)
@@ -230,7 +230,7 @@ func TestGracefulDegradation(t *testing.T) {
 	}
 
 	// Create service
-	gmpHistoryService := services.NewGMPHistoryService(db)
+	gmpHistoryService := services.NewGMPHistoryService(db, nil)
 	defer gmpHistoryService.Close()
 
 	t.Run("Service health check reflects circuit breaker state", func(t *testing.T) {
@@ -272,7 +272,7 @@ func TestResilienceQueueIntegration(t *testing.T) {
 	}
 
 	// Create service
-	gmpHistoryService := services.NewGMPHistoryService(db)
+	gmpHistoryService := services.NewGMPHistoryService(db, nil)
 	defer gmpHistoryService.Close()
 
 	t.Run("Resilience queue is initialized", func(t *testing.T) {
