@@ -244,7 +244,6 @@ func (s *EnhancedGMPService) FetchGMPData() ([]models.EnhancedGMPData, error) {
 	// We incremented successful parsed in loop, failed parsed can be inferred or we can adjust
 	s.extractionMetrics.FailedParsed += processingErrors
 
-
 	successRate := 0.0
 	if len(rawData) > 0 {
 		successRate = float64(successfulRecords) / float64(len(rawData)) * 100.0
@@ -732,7 +731,7 @@ func (s *EnhancedGMPService) SaveGMPData(gmpList []models.EnhancedGMPData) error
 
 	logrus.WithFields(logrus.Fields{
 		"component": "EnhancedGMPService",
-		"records": len(gmpList),
+		"records":   len(gmpList),
 	}).Info("Saving GMP data to database")
 
 	// Use transaction for efficiency
@@ -750,7 +749,8 @@ func (s *EnhancedGMPService) SaveGMPData(gmpList []models.EnhancedGMPData) error
 			data_source, stock_id, subscription_status, listing_gain,
 			ipo_status, extraction_metadata
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-		ON CONFLICT (ipo_name) DO UPDATE SET
+		ON CONFLICT (ipo_id, data_source) DO UPDATE SET
+			ipo_name = EXCLUDED.ipo_name,
 			ipo_id      = COALESCE(EXCLUDED.ipo_id, ipo_gmp.ipo_id),
 			company_code = COALESCE(EXCLUDED.company_code, ipo_gmp.company_code),
 			stock_id    = COALESCE(EXCLUDED.stock_id, ipo_gmp.stock_id),
@@ -795,7 +795,7 @@ func (s *EnhancedGMPService) SaveGMPData(gmpList []models.EnhancedGMPData) error
 
 	logrus.WithFields(logrus.Fields{
 		"component": "EnhancedGMPService",
-		"records": len(gmpList),
+		"records":   len(gmpList),
 	}).Info("Successfully saved GMP data")
 	return nil
 }
@@ -891,8 +891,8 @@ func (s *EnhancedGMPService) reconcileWithIPOList(gmpData []models.EnhancedGMPDa
 			unmatched++
 			logrus.WithFields(logrus.Fields{
 				"component": "EnhancedGMPService",
-				"ipo_name": gmpData[i].IPOName,
-				"slug":     gmpSlug,
+				"ipo_name":  gmpData[i].IPOName,
+				"slug":      gmpSlug,
 			}).Debug("reconcileWithIPOList: no match found in ipo_list")
 		}
 	}
