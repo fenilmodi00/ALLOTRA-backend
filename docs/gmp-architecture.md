@@ -9,7 +9,7 @@ This repository has two GMP domains:
 
 - `jobs/gmp_update_job.go`
   - Scheduled job for latest GMP snapshot updates.
-  - Uses `services/SimpleGMPService` (`services/simple_gmp_service.go`).
+  - Uses `services/GMPService` (`services/gmp_service.go`).
 
 - `jobs/gmp_history_update_job.go`
   - Scheduled job for GMP history updates.
@@ -21,9 +21,10 @@ This repository has two GMP domains:
 - `handlers/gmp_history_handler.go`
   - Serves history, chart, summary, health, and metrics endpoints.
 
-## Compatibility Layer
+## GMP Service
 
-- `services/gmp_service.go` remains for backward compatibility in tests and tooling.
+- `services/gmp_service.go` is the primary service for GMP data extraction.
+- It incorporates the efficient scraping logic previously found in `SimpleGMPService`.
 - IPO scraping methods in this file delegate to `services/simplified_ipo_scraper.go`
   (`ChittorgarhIPOScrapingService`) to avoid duplicate logic.
 

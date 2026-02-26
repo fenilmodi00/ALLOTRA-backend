@@ -33,7 +33,7 @@ func main() {
 
 	// Test 2: GMP Service
 	fmt.Print("📈 GMP Service: ")
-	gmp := services.NewSimpleGMPService(nil)
+	gmp := services.NewGMPService()
 	if gmpData, err := gmp.FetchGMPData(); err != nil {
 		fmt.Printf("❌ FAILED (%v)\n", err)
 	} else {
