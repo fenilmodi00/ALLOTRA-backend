@@ -14,6 +14,8 @@ import (
 )
 
 func main() {
+	cfg := config.LoadConfig()
+
 	fmt.Printf("🏥 IPO Scraper Health Check - %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Println(strings.Repeat("=", 50))
 
@@ -43,7 +45,6 @@ func main() {
 
 	// Test 3: Database
 	fmt.Print("🗄️  Database: ")
-	cfg := config.LoadConfig()
 	if err := database.Connect(cfg.DatabaseURL); err != nil {
 		fmt.Printf("❌ FAILED (%v)\n", err)
 	} else {

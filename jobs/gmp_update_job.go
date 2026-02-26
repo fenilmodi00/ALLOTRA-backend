@@ -20,7 +20,7 @@ type GMPUpdateJob struct {
 	isRunning    bool
 }
 
-func NewGMPUpdateJob(db *sql.DB, cacheService *services.CacheService) *GMPUpdateJob {
+func NewGMPUpdateJob(db *sql.DB, cacheService *services.CacheService, scraperURL string) *GMPUpdateJob {
 	return &GMPUpdateJob{
 		DB:           db,
 		GMPService:   services.NewGMPServiceWithDB(db),

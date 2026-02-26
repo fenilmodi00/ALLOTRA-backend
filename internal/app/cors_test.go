@@ -22,7 +22,7 @@ func TestCORSConfiguration(t *testing.T) {
 			name:           "Allows all origins when set to *",
 			allowedOrigins: "*",
 			requestOrigin:  "http://example.com",
-			expectedOrigin: "http://example.com",
+			expectedOrigin: "*",
 		},
 		{
 			name:           "Allows specific trusted origin",

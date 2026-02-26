@@ -17,6 +17,7 @@ type Config struct {
 	CacheTTLHours   string
 	LogLevel        string
 	IPOAlertsAPIKey string
+	InvestorGainURL string
 }
 
 // SimplifiedRateLimitConfig holds simplified rate limiting configuration
@@ -76,6 +77,7 @@ func LoadConfig() *Config {
 		CacheTTLHours:   getEnv("CACHE_TTL_HOURS", "24"),
 		LogLevel:        getEnv("LOG_LEVEL", "info"),
 		IPOAlertsAPIKey: getEnv("IPO_ALERTS_API_KEY", ""),
+		InvestorGainURL: getEnv("INVESTOR_GAIN_URL", "https://www.investorgain.com/report/live-ipo-gmp/331/all/"),
 	}
 }
 

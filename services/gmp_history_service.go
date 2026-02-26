@@ -288,6 +288,8 @@ func (s *GMPHistoryService) GetPriceHistoryByIPO(ipoID string, dateRange *models
 		"cache_hit":  false,
 	}).Info("Retrieving price history from database")
 
+	startTime := time.Now()
+
 	// Build query with optional date range filtering
 	query := `
 		SELECT
