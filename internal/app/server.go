@@ -24,6 +24,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type jobRunner interface {
+	Run()
+}
+
+type lifecycleJob interface {
+	Start()
+	Stop()
+}
+
 func Run(cfg *config.Config) error {
 	configureLogging(cfg.LogLevel)
 
@@ -243,3 +252,174 @@ func registerRoutes(
 	api.Get("/market/indices", marketHandler.GetMarketIndices)
 	api.Post("/cache/store", cacheHandler.StoreResult)
 	api.Get("/cache/:ipo_id/:pan_hash", cacheHandler.GetCachedResult)
+	api.Post("/check", checkHandler.CheckAllotment)
+
+	// V1 Admin Group
+	admin := api.Group("/admin", adminAuthMiddleware(cfg.AdminToken))
+	admin.Post("/ipos", adminHandler.CreateIPO)
+	admin.Post("/gmp/update", adminHandler.TriggerGMPUpdate)
+	admin.Get("/gmp/data", adminHandler.GetGMPData)
+	admin.Post("/gmp-history/update", adminHandler.TriggerGMPHistoryUpdate)
+	admin.Get("/gmp-history/status", adminHandler.GetGMPHistoryJobStatus)
+	admin.Get("/gmp-history/metrics", adminHandler.GetGMPHistoryJobMetrics)
+
+	// V2 Handlers
+	v2IpoHandler := handlers.NewV2IPOHandler(ipoService)
+	v2GmpHistoryHandler := handlers.NewV2GMPHistoryHandler(gmpHistoryHandler)
+	v2AdminHandler := handlers.NewV2AdminHandler(adminHandler)
+	v2AllotmentHandler := handlers.NewV2AllotmentHandler(ipoService, services.NewAllotmentChecker(), cacheService)
+
+	// V2 Public API Group (root level /api/v2)
+	v2 := app.Group("/api/v2")
+	v2.Get("/ipos/feed", v2IpoHandler.GetFeed)
+	v2.Get("/ipos/:id", v2IpoHandler.GetByID)
+	v2.Post("/allotment/check", v2AllotmentHandler.CheckAllotment)
+
+	// V2 GMP History
+	v2.Get("/gmp/history/:ipo_id/chart", v2GmpHistoryHandler.GetChartData)
+
+	// V2 Admin Group (within admin auth middleware)
+	v2Admin := v2.Group("/admin", adminAuthMiddleware(cfg.AdminToken))
+	v2Admin.Post("/ipos", v2AdminHandler.CreateIPO)
+	v2Admin.Post("/gmp/update", v2AdminHandler.TriggerGMPUpdate)
+	v2Admin.Get("/gmp/data", v2AdminHandler.GetGMPData)
+	v2Admin.Post("/gmp-history/update", v2AdminHandler.TriggerGMPHistoryUpdate)
+	v2Admin.Get("/gmp-history/status", v2AdminHandler.GetGMPHistoryJobStatus)
+	v2Admin.Get("/gmp-history/metrics", v2AdminHandler.GetGMPHistoryJobMetrics)
+
+	// Groww IPO scraper — testing & trigger endpoints
+
+	perf := api.Group("/performance")
+	perf.Get("/metrics", performanceHandler.GetPerformanceMetrics)
+	perf.Post("/test", performanceHandler.RunPerformanceTest)
+	perf.Delete("/cache", performanceHandler.ClearCache)
+	perf.Post("/cache/warmup", performanceHandler.WarmupCache)
+}
+
+func adminAuthMiddleware(adminToken string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if adminToken == "" {
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+				"success": false,
+				"error":   "Admin endpoints are disabled",
+				"message": "ADMIN_TOKEN is not configured",
+			})
+		}
+
+		authHeader := strings.TrimSpace(c.Get("Authorization"))
+		token := strings.TrimSpace(c.Get("X-Admin-Token"))
+		if token == "" && strings.HasPrefix(authHeader, "Bearer ") {
+			token = strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+		}
+
+		if token == "" || subtle.ConstantTimeCompare([]byte(token), []byte(adminToken)) != 1 {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"success": false,
+				"error":   "Unauthorized",
+				"message": "Valid admin token is required",
+			})
+		}
+
+		return c.Next()
+	}
+}
+
+func configureLogging(level string) {
+	if level == "" {
+		logrus.SetLevel(logrus.InfoLevel)
+		return
+	}
+
+	parsedLevel, err := logrus.ParseLevel(strings.ToLower(level))
+	if err != nil {
+		logrus.WithError(err).Warnf("Invalid LOG_LEVEL '%s', defaulting to info", level)
+		logrus.SetLevel(logrus.InfoLevel)
+		return
+	}
+
+	logrus.SetLevel(parsedLevel)
+}
+
+func logServiceConfiguration(cacheTTL time.Duration, cacheMaxSize int) {
+	defaultConfig := services.NewDefaultIPOScraperConfiguration()
+	logrus.Println("Simplified IPO backend services initialized:")
+	logrus.Printf("  - Simplified IPO scraper (rate limit: %v, timeout: %v)",
+		defaultConfig.RequestRateLimit, defaultConfig.HTTPRequestTimeout)
+	logrus.Printf("  - Allotment checker (rate limit: %v)", 2*time.Second)
+	logrus.Printf("  - Unified cache service (TTL: %v, max size: %d)", cacheTTL, cacheMaxSize)
+	logrus.Println("  - Utility service (text processing and normalization)")
+	logrus.Println("  - Simplified IPO service (lifecycle analyzer removed)")
+}
+
+func startBackgroundJobs(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	dailyJob jobRunner,
+	resultJob jobRunner,
+	cleanupJob jobRunner,
+	gmpJob jobRunner,
+	gmpHistoryJob jobRunner,
+	db *sql.DB,
+) {
+	useSupabaseCron := os.Getenv("USE_SUPABASE_CRON") == "true"
+
+	if useSupabaseCron {
+		// --- SUPABASE CRON MODE ---
+		// pg_cron inserts into job_dispatch table, Go polls and executes
+		logrus.Info("Using Supabase pg_cron scheduling (polling job_dispatch table)")
+
+		poller := jobs.NewJobPoller(db, 30*time.Second)
+
+		// Register each Go job as an executor for its job_type
+		poller.RegisterExecutor("daily_ipo_update", func(ctx context.Context, job jobs.JobDispatch) error {
+			safeJobRun("daily_ipo_update", dailyJob.Run)
+			return nil
+		})
+		poller.RegisterExecutor("gmp_update", func(ctx context.Context, job jobs.JobDispatch) error {
+			gmpJobRunner, ok := gmpJob.(jobRunner)
+			if ok {
+				safeJobRun("gmp_update", gmpJobRunner.Run)
+			}
+			return nil
+		})
+		poller.RegisterExecutor("gmp_history_update", func(ctx context.Context, job jobs.JobDispatch) error {
+			gmpHistoryRunner, ok := gmpHistoryJob.(jobRunner)
+			if ok {
+				safeJobRun("gmp_history_update", gmpHistoryRunner.Run)
+			}
+			return nil
+		})
+		poller.RegisterExecutor("result_release_check", func(ctx context.Context, job jobs.JobDispatch) error {
+			safeJobRun("result_release_check", resultJob.Run)
+			return nil
+		})
+		poller.RegisterExecutor("cache_cleanup", func(ctx context.Context, job jobs.JobDispatch) error {
+			safeJobRun("cache_cleanup", cleanupJob.Run)
+			return nil
+		})
+
+		poller.Start()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-ctx.Done()
+			poller.Stop()
+		}()
+
+		return
+	}
+}
+
+func safeJobRun(name string, run func()) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			logrus.WithFields(logrus.Fields{
+				"job":   name,
+				"panic": fmt.Sprintf("%v", recovered),
+			}).Error("Background job panicked and was isolated")
+		}
+	}()
+
+	run()
+}
