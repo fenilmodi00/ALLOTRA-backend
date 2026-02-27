@@ -79,13 +79,24 @@ func (s *GMPHistoryService) ResolveIPOIdentifier(identifier string) (string, err
 
 	// Try to parse as UUID first
 	if _, err := uuid.Parse(identifier); err == nil {
-		// It's a valid UUID, return as-is
+		// It's a valid UUID format - verify it exists in the database
+		var exists bool
+		checkQuery := `SELECT EXISTS(SELECT 1 FROM ipo_list WHERE id = $1)`
+		if err := s.DB.QueryRow(checkQuery, identifier).Scan(&exists); err != nil {
+			s.logger.WithFields(logrus.Fields{
+				"identifier": identifier,
+			}).WithError(err).Error("Database error in ResolveIPOIdentifier")
+			return "", fmt.Errorf("failed to verify UUID exists: %w", err)
+		}
+		if !exists {
+			return "", fmt.Errorf("no IPO found with id: %s", identifier)
+		}
 		return identifier, nil
 	}
 
 	// Not a UUID, try to look up by stock_id
 	var ipoID string
-	query := `SELECT id FROM ipo_list WHERE stock_id = $1 LIMIT 1`
+	query := `SELECT id FROM ipo_list WHERE stock_id = $1::varchar LIMIT 1`
 	err := s.DB.QueryRow(query, identifier).Scan(&ipoID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -234,9 +245,27 @@ func (s *GMPHistoryService) syncIPOGMPFromHistory(history *models.GMPPriceHistor
 		latest.SubscriptionStatus,
 		listingGain,
 	)
-
 	if err != nil {
-		return fmt.Errorf("failed to sync IPO GMP: %w", err)
+		// Retry once for transient prepared statement errors
+		s.logger.WithError(err).Warn("First sync attempt failed, retrying...")
+		_, err = s.DB.Exec(query,
+			uuid.New().String(),
+			history.IPOName,
+			history.IPOID,
+			history.CompanyCode,
+			ipoPrice,
+			latest.GMPValue,
+			estimatedListing,
+			gainPercent,
+			latest.LastUpdated,
+			"investorgain.com",
+			stockID.String,
+			latest.SubscriptionStatus,
+			listingGain,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to sync IPO GMP: %w", err)
+		}
 	}
 
 	s.logger.WithFields(logrus.Fields{
@@ -781,10 +810,15 @@ func (s *GMPHistoryService) ProcessAllActiveIPOHistory() (*models.ProcessingResu
 
 	rows, err := s.DB.Query(query, models.StatusLive, models.StatusUpcoming, models.StatusClosed, models.StatusResultOut, models.StatusListed)
 	if err != nil {
-		metrics.EndTime = time.Now()
-		metrics.ProcessingTime = metrics.EndTime.Sub(metrics.StartTime)
-		s.updateJobLogOnError(jobLogID, metrics, fmt.Sprintf("Failed to query IPOs: %v", err))
-		return nil, fmt.Errorf("failed to query IPOs: %w", err)
+		// Retry once for transient prepared statement errors
+		s.logger.WithError(err).Warn("First query attempt failed, retrying...")
+		rows, err = s.DB.Query(query, models.StatusLive, models.StatusUpcoming, models.StatusClosed, models.StatusResultOut, models.StatusListed)
+		if err != nil {
+			metrics.EndTime = time.Now()
+			metrics.ProcessingTime = metrics.EndTime.Sub(metrics.StartTime)
+			s.updateJobLogOnError(jobLogID, metrics, fmt.Sprintf("Failed to query IPOs: %v", err))
+			return nil, fmt.Errorf("failed to query IPOs: %w", err)
+		}
 	}
 	defer rows.Close()
 

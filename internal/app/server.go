@@ -240,6 +240,36 @@ func registerRoutes(
 		})
 	})
 
+	app.Get("/kaithhealthcheck", func(c *fiber.Ctx) error {
+		pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		dbErr := db.PingContext(pingCtx)
+		status := "ok"
+		statusCode := fiber.StatusOK
+		details := fiber.Map{"database": "ok"}
+
+		if dbErr != nil {
+			status = "degraded"
+			statusCode = fiber.StatusServiceUnavailable
+			details["database"] = dbErr.Error()
+		}
+
+		redisErr := redisClient.Ping(pingCtx).Err()
+		if redisErr != nil {
+			status = "degraded"
+			details["redis"] = redisErr.Error()
+		} else {
+			details["redis"] = "ok"
+		}
+
+		return c.Status(statusCode).JSON(fiber.Map{
+			"status":    status,
+			"timestamp": time.Now().Unix(),
+			"details":   details,
+		})
+	})
+
 	app.Get("/ready", func(c *fiber.Ctx) error {
 		pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()

@@ -135,7 +135,12 @@ func (p *JobPoller) claimPendingJobs(ctx context.Context, limit int) ([]JobDispa
 
 	rows, err := p.db.QueryContext(ctx, query, limit)
 	if err != nil {
-		return nil, fmt.Errorf("claim pending jobs: %w", err)
+		// Retry once for transient prepared statement errors
+		logrus.WithError(err).Warn("First claim attempt failed, retrying...")
+		rows, err = p.db.QueryContext(ctx, query, limit)
+		if err != nil {
+			return nil, fmt.Errorf("claim pending jobs: %w", err)
+		}
 	}
 	defer rows.Close()
 

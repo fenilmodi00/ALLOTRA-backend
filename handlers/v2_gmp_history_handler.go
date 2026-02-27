@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"strconv"
+
 	"github.com/fenilmodi00/ipo-backend/shared"
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 )
 
 type V2GMPHistoryHandler struct {
@@ -18,6 +21,10 @@ func (h *V2GMPHistoryHandler) GetChartData(c *fiber.Ctx) error {
 	identifier := c.Params("ipo_id")
 	if identifier == "" {
 		return c.Status(400).JSON(shared.NewV2ErrorResponse("BAD_REQUEST", "IPO ID is required", nil))
+	}
+
+	if !isValidIPOIdentifierV2(identifier) {
+		return c.Status(400).JSON(shared.NewV2ErrorResponse("BAD_REQUEST", "Invalid IPO identifier. Must be a valid UUID or numeric stock ID", nil))
 	}
 
 	// Resolve identifier to IPO ID (UUID)
@@ -42,6 +49,10 @@ func (h *V2GMPHistoryHandler) GetIPOPriceHistory(c *fiber.Ctx) error {
 	identifier := c.Params("ipo_id")
 	if identifier == "" {
 		return c.Status(400).JSON(shared.NewV2ErrorResponse("BAD_REQUEST", "IPO ID is required", nil))
+	}
+
+	if !isValidIPOIdentifierV2(identifier) {
+		return c.Status(400).JSON(shared.NewV2ErrorResponse("BAD_REQUEST", "Invalid IPO identifier. Must be a valid UUID or numeric stock ID", nil))
 	}
 
 	// Resolve identifier to IPO ID (UUID)
@@ -89,6 +100,10 @@ func (h *V2GMPHistoryHandler) GetHistorySummary(c *fiber.Ctx) error {
 		return c.Status(400).JSON(shared.NewV2ErrorResponse("BAD_REQUEST", "IPO ID is required", nil))
 	}
 
+	if !isValidIPOIdentifierV2(identifier) {
+		return c.Status(400).JSON(shared.NewV2ErrorResponse("BAD_REQUEST", "Invalid IPO identifier. Must be a valid UUID or numeric stock ID", nil))
+	}
+
 	// Resolve identifier to IPO ID (UUID)
 	ipoID, err := h.LegacyHandler.Service.ResolveIPOIdentifier(identifier)
 	if err != nil {
@@ -104,4 +119,15 @@ func (h *V2GMPHistoryHandler) GetHistorySummary(c *fiber.Ctx) error {
 	summary := calculateSummaryStatistics(history)
 
 	return c.JSON(shared.NewV2Response(summary))
+}
+
+func isValidIPOIdentifierV2(identifier string) bool {
+	if identifier == "" {
+		return false
+	}
+	if _, err := strconv.Atoi(identifier); err == nil {
+		return true
+	}
+	_, err := uuid.Parse(identifier)
+	return err == nil
 }
