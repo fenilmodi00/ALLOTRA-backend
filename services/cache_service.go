@@ -185,54 +185,18 @@ func (cis *CachedIPOService) GetIPOByIDWithGMP(ctx context.Context, id string) (
 	return ipo, nil
 }
 
-// GetActiveIPOs returns active IPOs using cache when possible
+// GetActiveIPOs returns active IPOs.
+// We DO NOT cache the entire list to avoid Redis 128KB payload limits.
+// The database is heavily indexed and handles this efficiently.
 func (cis *CachedIPOService) GetActiveIPOs(ctx context.Context) ([]models.IPO, error) {
-	cacheKey := "active_ipos"
-
-	// Try to get from cache first
-	if raw, found := cis.cache.GetRaw(cacheKey); found {
-		var ipos []models.IPO
-		if err := json.Unmarshal([]byte(raw), &ipos); err == nil {
-			return ipos, nil
-		}
-		logrus.WithField("key", cacheKey).Error("Failed to unmarshal cached value")
-	}
-
-	// Cache miss - fetch from database
-	ipos, err := cis.ipoService.GetActiveIPOs(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Cache the result for 5 minutes
-	cis.cache.SetWithTTL(cacheKey, ipos, 5*time.Minute)
-
-	return ipos, nil
+	return cis.ipoService.GetActiveIPOs(ctx)
 }
 
-// GetIPOs returns IPOs with status filter, using cache when possible
+// GetIPOs returns IPOs with status filter.
+// We DO NOT cache the entire list to avoid Redis 128KB payload limits.
+// The database is heavily indexed and handles this efficiently.
 func (cis *CachedIPOService) GetIPOs(ctx context.Context, status string) ([]models.IPO, error) {
-	cacheKey := fmt.Sprintf("ipos:%s", status)
-
-	// Try to get from cache first
-	if raw, found := cis.cache.GetRaw(cacheKey); found {
-		var ipos []models.IPO
-		if err := json.Unmarshal([]byte(raw), &ipos); err == nil {
-			return ipos, nil
-		}
-		logrus.WithField("key", cacheKey).Error("Failed to unmarshal cached value")
-	}
-
-	// Cache miss - fetch from database
-	ipos, err := cis.ipoService.GetIPOs(ctx, status)
-	if err != nil {
-		return nil, err
-	}
-
-	// Cache the result for 3 minutes (filtered results may change more frequently)
-	cis.cache.SetWithTTL(cacheKey, ipos, 3*time.Minute)
-
-	return ipos, nil
+	return cis.ipoService.GetIPOs(ctx, status)
 }
 
 // GetIPOByID returns a single IPO by ID, using cache when possible
@@ -290,20 +254,8 @@ func (cis *CachedIPOService) GetCacheStats() map[string]interface{} {
 	}
 }
 
-// WarmupCache pre-loads frequently accessed data into cache
+// WarmupCache is a no-op since we no longer cache large IPO lists to avoid Redis 128KB payload limits.
 func (cis *CachedIPOService) WarmupCache(ctx context.Context) error {
-	// Pre-load active IPOs
-	_, err := cis.GetActiveIPOs(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to warmup active IPOs cache: %w", err)
-	}
-
-	// Pre-load active IPOs with GMP
-	_, err = cis.GetActiveIPOsWithGMP(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to warmup active IPOs with GMP cache: %w", err)
-	}
-
 	return nil
 }
 
