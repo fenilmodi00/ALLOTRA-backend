@@ -13,10 +13,13 @@ type IPO struct {
 	StockID string    `json:"stock_id" db:"stock_id"`
 
 	// Basic Information (from IPOBasicInformation)
-	Name        string  `json:"name" db:"name"`
-	CompanyCode string  `json:"company_code" db:"company_code"`
-	Symbol      *string `json:"symbol" db:"symbol"`
-	Registrar   string  `json:"registrar" db:"registrar"`
+	Name                 string  `json:"name" db:"name"`
+	CompanyCode          string  `json:"company_code" db:"company_code"`
+	Symbol               *string `json:"symbol" db:"symbol"`
+	Registrar            string  `json:"registrar" db:"registrar"`
+	RegistrarID          *string `json:"registrar_id" db:"registrar_id"`
+	RegistrarCompanyCode *string `json:"registrar_company_code" db:"registrar_company_code"`
+	IsRegistrarFetched   bool    `json:"is_registrar_fetched" db:"is_fetched"`
 
 	// Date Information (from IPODateInformation)
 	OpenDate    *time.Time `json:"open_date" db:"open_date"`
