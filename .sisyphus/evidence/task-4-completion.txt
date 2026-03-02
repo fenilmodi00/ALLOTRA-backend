@@ -1,0 +1,52 @@
+TASK 4: PostgresRegistrarCodeRepository Implementation
+======================================================
+
+✓ COMPLETED
+
+Deliverables Checklist:
+======================
+✓ File created: .worktrees/ipo-allotment-registrar/repositories/registrar_code_repository.go
+✓ PostgresRegistrarCodeRepository struct with db *sql.DB field
+✓ Constructor: NewPostgresRegistrarCodeRepository(db *sql.DB)
+✓ Method 1 - Upsert: Implemented with INSERT ON CONFLICT pattern (line 22)
+✓ Method 2 - GetByIPOAndRegistrar: Implemented with WHERE clause (line 65)
+✓ Method 3 - GetUnresolvedByResultDate: Implemented with JOIN pattern (line 101)
+✓ Uses database/sql for queries (not sqlx)
+✓ Proper error handling with context.WithTimeout(ctx, 5*time.Second)
+✓ Compiles successfully: go build -v ./repositories/
+✓ Evidence saved to .sisyphus/evidence/task-4-repo-build.txt
+
+Implementation Details:
+======================
+File Size: 3.9K (146 lines)
+
+1. Upsert Method (line 22-62):
+   - INSERT ON CONFLICT (ipo_id, registrar_short_code) DO UPDATE
+   - Updates: registrar_company_code, ipo_name, match_score, is_resolved, last_attempted_at, updated_at
+   - Proper error handling with fmt.Errorf wrapping
+
+2. GetByIPOAndRegistrar Method (line 65-100):
+   - WHERE ipo_id = $1 AND registrar_short_code = $2
+   - Returns ErrNotFound for sql.ErrNoRows (from errors.go)
+   - Single row query with QueryRowContext
+
+3. GetUnresolvedByResultDate Method (line 101-146):
+   - JOINs registrar_codes with ipo_list
+   - WHERE rc.is_resolved = false AND DATE(i.result_date) = DATE($1)
+   - Returns slice of unresolved codes ordered by created_at DESC
+   - Proper row iteration and error handling
+
+Code Quality:
+=============
+✓ Follows gmp_repository.go pattern exactly
+✓ Uses context.WithTimeout for all database operations
+✓ Proper error wrapping with fmt.Errorf
+✓ Uses database/sql.DB (standard library, no external deps)
+✓ No business logic (data access only)
+✓ Consistent with existing repository implementations
+✓ Proper cleanup with defer cancel()
+✓ Reuses ErrNotFound from errors.go
+
+Compilation Status: SUCCESS
+All tests: Package compiles without errors
+Build Evidence: .sisyphus/evidence/task-4-repo-build.txt

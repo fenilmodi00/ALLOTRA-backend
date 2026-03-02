@@ -16,10 +16,10 @@ import (
 )
 
 type V2AllotmentHandler struct {
-	IPOService            *services.IPOService
-	AllotmentChecker      *services.AllotmentChecker
-	CacheService          *services.CacheService
-	RegistrarCodeService  *services.RegistrarCodeService
+	IPOService           *services.IPOService
+	AllotmentChecker     *services.AllotmentChecker
+	CacheService         *services.CacheService
+	RegistrarCodeService *services.RegistrarCodeService
 }
 
 func NewV2AllotmentHandler(ipo *services.IPOService, allotmentChecker *services.AllotmentChecker, cache *services.CacheService, registrarCodeService *services.RegistrarCodeService) *V2AllotmentHandler {
@@ -101,19 +101,32 @@ func (h *V2AllotmentHandler) CheckAllotment(c *fiber.Ctx) error {
 		}
 	}
 
-	// Check Allotment Status
-	status, sharesAllotted, err := h.AllotmentChecker.CheckAllotmentStatus(c.Context(), ipo, req.PAN)
+	if resolvedCode.RegistrarCompanyCode == nil || *resolvedCode.RegistrarCompanyCode == "" {
+		resolvedCode, err = h.RegistrarCodeService.ResolveCode(c.Context(), ipo.ID, registrarShortCode, ipo.Name)
+		if err != nil || resolvedCode == nil || !resolvedCode.IsResolved || resolvedCode.RegistrarCompanyCode == nil || *resolvedCode.RegistrarCompanyCode == "" {
+			return c.Status(503).JSON(shared.NewV2ErrorResponse("SERVICE_UNAVAILABLE", "Company code not yet resolved", nil))
+		}
+	}
+
+	client := registrars.GetClient(registrarShortCode)
+	if client == nil {
+		return c.Status(503).JSON(shared.NewV2ErrorResponse("SERVICE_UNAVAILABLE", "Unsupported registrar: "+registrarShortCode, nil))
+	}
+
+	allotmentResult, err := client.CheckAllotment(c.Context(), *resolvedCode.RegistrarCompanyCode, req.PAN)
 	if err != nil {
 		return c.Status(502).JSON(shared.NewV2ErrorResponse("BAD_GATEWAY", "Failed to check allotment status", nil))
 	}
+	if allotmentResult == nil {
+		return c.Status(502).JSON(shared.NewV2ErrorResponse("BAD_GATEWAY", "Failed to check allotment status", nil))
+	}
+
+	status := allotmentResult.Status
+	sharesApplied := allotmentResult.SharesApplied
+	sharesAllotted := allotmentResult.SharesAllotted
 
 	// Build response message
 	message := getAllotmentMessage(status)
-
-	sharesApplied := 0
-	if ipo.MinQty != nil {
-		sharesApplied = *ipo.MinQty
-	}
 
 	response := V2AllotmentResponse{
 		Status:         status,
@@ -124,12 +137,13 @@ func (h *V2AllotmentHandler) CheckAllotment(c *fiber.Ctx) error {
 
 	// Cache result (fire and forget)
 	result := models.IPOResultCache{
-		PanHash:        req.PAN,
-		IPOID:          ipo.ID,
-		Status:         status,
-		SharesAllotted: sharesAllotted,
-		Source:         "v2_check",
-		Timestamp:      time.Now(),
+		PanHash:           req.PAN,
+		IPOID:             ipo.ID,
+		Status:            status,
+		SharesAllotted:    sharesAllotted,
+		ApplicationNumber: allotmentResult.ApplicationNo,
+		Source:            "v2_check",
+		Timestamp:         time.Now(),
 	}
 	go h.CacheService.StoreResult(c.Context(), &result)
 

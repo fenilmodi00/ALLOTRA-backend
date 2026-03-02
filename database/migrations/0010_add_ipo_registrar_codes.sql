@@ -1,9 +1,8 @@
+-- +goose Up
 -- Migration: Add IPO Registrar Codes table
 -- Purpose: Store registrar short codes and company codes for IPOs to support
 --          allotment registrar matching and resolution tracking
-BEGIN;
-
-CREATE TABLE ipo_registrar_codes (
+CREATE TABLE IF NOT EXISTS ipo_registrar_codes (
     -- Primary identification
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     
@@ -31,11 +30,12 @@ CREATE TABLE ipo_registrar_codes (
 );
 
 -- Index for common lookup patterns
-CREATE INDEX idx_ipo_registrar_codes_ipo_id_registrar_short_code 
+CREATE INDEX IF NOT EXISTS idx_ipo_registrar_codes_ipo_id_registrar_short_code 
 ON ipo_registrar_codes(ipo_id, registrar_short_code);
 
 -- Index for scheduler queries to find unresolved codes for retry
-CREATE INDEX idx_ipo_registrar_codes_is_resolved_last_attempted_at 
+CREATE INDEX IF NOT EXISTS idx_ipo_registrar_codes_is_resolved_last_attempted_at 
 ON ipo_registrar_codes(is_resolved, last_attempted_at);
 
-COMMIT;
+-- +goose Down
+DROP TABLE IF EXISTS ipo_registrar_codes;

@@ -1,0 +1,9 @@
+Build output: 
+
+Exit code: 0
+
+Verification: PASS
+- Payload parsing: correct
+- IST timezone handling: correct
+- Date/time validation: correct (skip, not error)
+- Service call: correct parameters

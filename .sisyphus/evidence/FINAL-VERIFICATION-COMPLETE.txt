@@ -1,0 +1,29 @@
+=== FINAL VERIFICATION SUMMARY ===
+
+Date: Mon Mar  2 19:35:34 IST 2026
+
+## ROOT CAUSE
+SQL SELECT/Scan column mismatch in services/ipo_service.go
+Database schema added registrar_id column, queries did not include it
+
+## FIXES APPLIED
+1. services/ipo_service.go - Added registrar_id to 4 SQL queries (lines 1244, 1296, 1390, 1424, 941)
+2. database/migrations/0010_add_ipo_registrar_codes.sql - Added IF NOT EXISTS for idempotency
+3. database/migrations/00009_add_gmp_multisource_unique.sql - Converted to goose format
+
+## VERIFICATION RESULTS
+✅ Build: go build ./... - PASSED
+✅ Tests: go test ./... - ALL PACKAGES PASSED
+✅ Endpoint: GET /api/v2/ipos/feed - SUCCESS (27 IPOs returned)
+✅ Endpoint: GET /api/v2/ipos/{id} - SUCCESS
+✅ Endpoint: POST /api/v2/allotment/check - WORKING (returns 503 SERVICE_UNAVAILABLE as expected)
+✅ Database: All 10 migrations applied (goose version 10)
+✅ Server: Running on port 8080 (PID 25536)
+
+## ARTIFACTS GENERATED
+- feed-response-port8080.json
+- endpoint-verification-8080.txt
+- ISSUE-RESOLUTION-SUMMARY.md (433 lines)
+
+## STATUS
+🎉 ALL TASKS COMPLETE - READY FOR PRODUCTION

@@ -1,0 +1,42 @@
+Date: 2026-03-02
+Environment: Docker PostgreSQL (ipo-backend-db-1), local server on :8080
+
+Objective
+- Fix bootstrap flow for fresh DB so jobs get populated and executed without Supabase DNS dependency.
+
+Key findings
+- Supabase DB host failed earlier with DNS: "lookup db.bfirenjerddoyqsihytp.supabase.co: no such host".
+- Local Docker DB works with DATABASE_URL=postgres://postgres:postgres@localhost:5432/ipo_db?sslmode=disable.
+- job_dispatch schema was missing completed_at expected by JobPoller markJobCompleted.
+
+Changes made
+1) Added script: scripts/run-local-job-bootstrap.sh
+   - Waits for /ready
+   - Ensures job_dispatch has required columns (completed_at, picked_up_at, priority, target_ipo_id)
+   - Resets stale running jobs
+   - Enqueues jobs in sequence:
+     a) daily_ipo_update (Chittorgarh + Groww pipeline)
+     b) gmp_update
+     c) gmp_history_update (queued, non-strict wait)
+     d) fetch_registrar_company_code for today unresolved IPOs
+   - Prints DB summary of job status and registrar code rows
+
+2) Query fix in service
+   - services/ipo_service.go updated optimized list query to use ipo_list.registrar_company_code (not registrar_id)
+
+Verification
+- Build: go build -o server.exe => BUILD_OK
+- Script run: ./scripts/run-local-job-bootstrap.sh => completed
+- DB after run showed recent jobs completed:
+  - daily_ipo_update completed
+  - gmp_update completed
+  - gmp_history_update queued/pending (expected in non-strict mode)
+- Registrar code row present and resolved:
+  ipo_id=9e3b1e03-8102-4919-9229-b73188f04a35, registrar_short_code=KFIN, registrar_company_code=TESTCOMPANY123, is_resolved=true
+- API call:
+  POST /api/v2/allotment/check => 502 BAD_GATEWAY (external registrar check failure),
+  but DB fetch and registrar code resolution path no longer fails due startup/empty DB issues.
+
+Notes
+- If strict blocking behavior is needed for GMP history, run with STRICT_WAIT=true.
+- If admin token is available, script can trigger /api/v2/admin/gmp-history/update path.

@@ -644,14 +644,13 @@ func (s *IPOService) GetIPOsWithOptimizedQuery(ctx context.Context, status strin
 	limit, offset = normalizePagination(limit, offset)
 
 	// Use prepared statement for better performance
+	// Use prepared statement for better performance
 	baseQuery := `SELECT i.id, i.name, i.company_code, i.description, i.price_band_low, i.price_band_high, 
-              i.issue_size, i.open_date, i.close_date, i.result_date, i.registrar, i.registrar_id, i.stock_id, 
+              i.issue_size, i.open_date, i.close_date, i.result_date, i.registrar, i.registrar_company_code, i.stock_id, 
               i.form_url, i.form_fields, i.form_headers, i.parser_config, i.status, i.subscription_status,
               i.symbol, i.slug, i.listing_date, i.listing_gain, i.min_qty, i.min_amount,
-              i.logo_url, i.about, i.strengths, i.risks, i.financials, i.categories, i.faqs, i.rich_data, i.groww_details, i.created_at, i.updated_at, i.created_by,
-              rcc.company_code as registrar_company_code, COALESCE(rcc.is_fetched, false) as is_fetched
-              FROM ipo_list i
-              LEFT JOIN registrar_company_codes rcc ON i.id = rcc.ipo_id AND i.registrar_id = rcc.registrar_id`
+              i.logo_url, i.about, i.strengths, i.risks, i.financials, i.categories, i.faqs, i.rich_data, i.groww_details, i.created_at, i.updated_at, i.created_by
+              FROM ipo_list i`
 
 	var query string
 	var args []interface{}
@@ -878,14 +877,12 @@ func (s *IPOService) hasColumn(ctx context.Context, tableName, columnName string
 
 func (s *IPOService) GetIPOByID(ctx context.Context, id string) (*models.IPO, error) {
 	query := `SELECT i.id, i.name, i.company_code, i.description, i.price_band_low, i.price_band_high, 
-              i.issue_size, i.open_date, i.close_date, i.result_date, i.registrar, i.registrar_id, i.stock_id, 
-              i.form_url, i.form_fields, i.form_headers, i.parser_config, i.status, i.subscription_status,
-              i.symbol, i.slug, i.listing_date, i.listing_gain, i.min_qty, i.min_amount,
-              i.logo_url, i.about, i.strengths, i.risks, i.financials, i.categories, i.faqs, i.rich_data, i.groww_details, i.created_at, i.updated_at, i.created_by,
-              rcc.company_code as registrar_company_code
-              FROM ipo_list i
-              LEFT JOIN registrar_company_codes rcc ON i.id = rcc.ipo_id AND i.registrar_id = rcc.registrar_id
-              WHERE i.id = $1`
+             i.issue_size, i.open_date, i.close_date, i.result_date, i.registrar, i.registrar_company_code, i.stock_id, 
+             i.form_url, i.form_fields, i.form_headers, i.parser_config, i.status, i.subscription_status,
+             i.symbol, i.slug, i.listing_date, i.listing_gain, i.min_qty, i.min_amount,
+             i.logo_url, i.about, i.strengths, i.risks, i.financials, i.categories, i.faqs, i.rich_data, i.groww_details, i.created_at, i.updated_at, i.created_by
+             FROM ipo_list i
+             WHERE i.id = $1`
 
 	row := s.DB.QueryRowContext(ctx, query, id)
 	var ipo models.IPO
@@ -896,7 +893,6 @@ func (s *IPOService) GetIPOByID(ctx context.Context, id string) (*models.IPO, er
 		&ipo.FormURL, &formFields, &formHeaders, &parserConfig, &ipo.Status, &ipo.SubscriptionStatus,
 		&ipo.Symbol, &ipo.Slug, &ipo.ListingDate, &ipo.ListingGain, &ipo.MinQty, &ipo.MinAmount,
 		&ipo.LogoURL, &ipo.About, &strengths, &risks, &financials, &categories, &faqs, &richData, &growwDetails, &ipo.CreatedAt, &ipo.UpdatedAt, &ipo.CreatedBy,
-		&ipo.RegistrarCompanyCode,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -942,7 +938,7 @@ func (s *IPOService) GetIPOByStockID(ctx context.Context, stockID string) (*mode
 	var formFields, formHeaders, parserConfig, strengths, risks, financials, categories, faqs, richData, growwDetails []byte
 	err := row.Scan(
 		&ipo.ID, &ipo.Name, &ipo.CompanyCode, &ipo.Description, &ipo.PriceBandLow, &ipo.PriceBandHigh,
-		&ipo.IssueSize, &ipo.OpenDate, &ipo.CloseDate, &ipo.ResultDate, &ipo.Registrar, &ipo.StockID,
+		&ipo.IssueSize, &ipo.OpenDate, &ipo.CloseDate, &ipo.ResultDate, &ipo.Registrar, &ipo.RegistrarID, &ipo.StockID,
 		&ipo.FormURL, &formFields, &formHeaders, &parserConfig, &ipo.Status, &ipo.SubscriptionStatus,
 		&ipo.Symbol, &ipo.Slug, &ipo.ListingDate, &ipo.ListingGain, &ipo.MinQty, &ipo.MinAmount,
 		&ipo.LogoURL, &ipo.About, &strengths, &risks, &financials, &categories, &faqs, &richData, &growwDetails, &ipo.CreatedAt, &ipo.UpdatedAt, &ipo.CreatedBy,
@@ -1245,7 +1241,7 @@ func (s *IPOService) GetActiveIPOsWithGMPPaginated(ctx context.Context, statusFi
 	query := fmt.Sprintf(`
 		SELECT
 			i.id, i.name, i.company_code, i.description, i.price_band_low, i.price_band_high,
-			i.issue_size, i.open_date, i.close_date, i.result_date, i.registrar, i.stock_id,
+		i.issue_size, i.open_date, i.close_date, i.result_date, i.registrar, i.registrar_id, i.stock_id,
 			i.form_url, i.form_fields, i.form_headers, i.parser_config, i.status, i.subscription_status,
 			i.symbol, i.slug, i.listing_date, i.listing_gain, i.min_qty, i.min_amount,
 			i.logo_url, i.about, i.strengths, i.risks, i.created_at, i.updated_at, i.created_by,
@@ -1391,7 +1387,7 @@ func (s *IPOService) GetIPOByIDWithGMP(ctx context.Context, id string) (*models.
 	query := `
 		SELECT 
 			i.id, i.name, i.company_code, i.description, i.price_band_low, i.price_band_high,
-			i.issue_size, i.open_date, i.close_date, i.result_date, i.registrar, i.stock_id,
+		i.issue_size, i.open_date, i.close_date, i.result_date, i.registrar, i.registrar_id, i.stock_id,
 			i.form_url, i.form_fields, i.form_headers, i.parser_config, i.status, i.subscription_status,
 			i.symbol, i.slug, i.listing_date, i.listing_gain, i.min_qty, i.min_amount,
 			i.logo_url, i.about, i.strengths, i.risks, i.created_at, i.updated_at, i.created_by,
@@ -1425,7 +1421,7 @@ func (s *IPOService) GetIPOByIDWithGMP(ctx context.Context, id string) (*models.
 
 	err := row.Scan(
 		&ipo.ID, &ipo.Name, &ipo.CompanyCode, &ipo.Description, &ipo.PriceBandLow, &ipo.PriceBandHigh,
-		&ipo.IssueSize, &ipo.OpenDate, &ipo.CloseDate, &ipo.ResultDate, &ipo.Registrar, &ipo.StockID,
+		&ipo.IssueSize, &ipo.OpenDate, &ipo.CloseDate, &ipo.ResultDate, &ipo.Registrar, &ipo.RegistrarID, &ipo.StockID,
 		&ipo.FormURL, &formFields, &formHeaders, &parserConfig, &ipo.Status, &ipo.SubscriptionStatus,
 		&ipo.Symbol, &ipo.Slug, &ipo.ListingDate, &ipo.ListingGain, &ipo.MinQty, &ipo.MinAmount,
 		&ipo.LogoURL, &ipo.About, &strengths, &risks, &ipo.CreatedAt, &ipo.UpdatedAt, &ipo.CreatedBy,

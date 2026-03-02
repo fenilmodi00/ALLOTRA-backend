@@ -1,0 +1,31 @@
+KFin API error evidence for listing attempts
+Timestamp: 2026-03-02
+
+Request headers used
+- Origin: https://ipostatus.kfintech.com
+- Referer: https://ipostatus.kfintech.com/
+
+Results
+1) GET /prod/api/query (no params)
+   - HTTP 502
+   - Body: {"message": "Internal server error"}
+
+2) GET /prod/api/query?type=ipo
+   - HTTP 502
+   - Body: {"message": "Internal server error"}
+
+3) GET /prod/api/query?type=list
+   - HTTP 502
+   - Body: {"message": "Internal server error"}
+
+4) GET /prod/api/query?type=pan (no ipocode/pan)
+   - HTTP 502
+   - Body: {"message": "Internal server error"}
+
+5) GET/POST /prod/api/ipolist, /prod/api/ipo, /prod/api/list
+   - HTTP 403
+   - Body: {"message":"Missing Authentication Token"}
+
+Interpretation
+- /query exists but expects complete lookup params.
+- Candidate listing paths are not deployed/public on this API gateway.

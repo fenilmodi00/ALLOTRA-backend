@@ -56,17 +56,22 @@ func Run(cfg *config.Config) error {
 		logrus.WithError(err).Error("Goose migrations failed, continuing with existing schema")
 	}
 
-	redisOpt, err := redis.ParseURL(cfg.RedisURL)
-	if err != nil {
-		return fmt.Errorf("failed to parse REDIS_URL: %w", err)
-	}
-	redisClient := redis.NewClient(redisOpt)
-	defer redisClient.Close()
+	var redisClient *redis.Client
+	if cfg.RedisURL != "" {
+		redisOpt, err := redis.ParseURL(cfg.RedisURL)
+		if err != nil {
+			return fmt.Errorf("failed to parse REDIS_URL: %w", err)
+		}
+		redisClient = redis.NewClient(redisOpt)
+		defer redisClient.Close()
 
-	if err := redisClient.Ping(context.Background()).Err(); err != nil {
-		logrus.WithError(err).Warn("Redis ping failed, cache operations may fail")
+		if err := redisClient.Ping(context.Background()).Err(); err != nil {
+			logrus.WithError(err).Warn("Redis ping failed, cache operations may fail")
+		} else {
+			logrus.Info("Redis connected successfully")
+		}
 	} else {
-		logrus.Info("Redis connected successfully")
+		logrus.Warn("REDIS_URL not configured, using in-memory cache only")
 	}
 
 	cacheConfig := config.DefaultCacheConfig()
@@ -103,7 +108,7 @@ func Run(cfg *config.Config) error {
 
 	ipoHandler := handlers.NewIPOHandler(ipoService)
 	cacheHandler := handlers.NewCacheHandler(cacheService)
-	adminHandler := handlers.NewAdminHandler(db, ipoService, gmpJob, gmpHistoryJob)
+	adminHandler := handlers.NewAdminHandler(db, ipoService, gmpJob, gmpHistoryJob, dailyJob, registrarCodeService)
 	checkHandler := handlers.NewCheckHandler(ipoService, allotmentChecker, cacheService)
 	marketHandler := handlers.NewMarketHandler()
 	gmpHandler := handlers.NewGMPHandler(db, gmpHistoryService)
@@ -315,6 +320,7 @@ func registerRoutes(
 	// V1 Admin Group
 	admin := api.Group("/admin", adminAuthMiddleware(cfg.AdminToken))
 	admin.Post("/ipos", adminHandler.CreateIPO)
+	admin.Post("/ipo/daily-update", adminHandler.TriggerDailyUpdate)
 	admin.Post("/gmp/update", adminHandler.TriggerGMPUpdate)
 	admin.Get("/gmp/data", adminHandler.GetGMPData)
 	admin.Post("/gmp-history/update", adminHandler.TriggerGMPHistoryUpdate)
@@ -339,11 +345,13 @@ func registerRoutes(
 	// V2 Admin Group (within admin auth middleware)
 	v2Admin := v2.Group("/admin", adminAuthMiddleware(cfg.AdminToken))
 	v2Admin.Post("/ipos", v2AdminHandler.CreateIPO)
+	v2Admin.Post("/ipo/daily-update", v2AdminHandler.TriggerDailyUpdate)
 	v2Admin.Post("/gmp/update", v2AdminHandler.TriggerGMPUpdate)
 	v2Admin.Get("/gmp/data", v2AdminHandler.GetGMPData)
 	v2Admin.Post("/gmp-history/update", v2AdminHandler.TriggerGMPHistoryUpdate)
 	v2Admin.Get("/gmp-history/status", v2AdminHandler.GetGMPHistoryJobStatus)
 	v2Admin.Get("/gmp-history/metrics", v2AdminHandler.GetGMPHistoryJobMetrics)
+	v2Admin.Post("/registrar/resolve", v2AdminHandler.TriggerRegistrarResolve)
 
 	// Groww IPO scraper — testing & trigger endpoints
 
@@ -423,6 +431,10 @@ func startBackgroundJobs(
 	registrarCodeService *services.RegistrarCodeService,
 ) {
 	useSupabaseCron := os.Getenv("USE_SUPABASE_CRON") == "true"
+	logrus.WithFields(logrus.Fields{
+		"USE_SUPABASE_CRON_raw": os.Getenv("USE_SUPABASE_CRON"),
+		"useSupabaseCron":      useSupabaseCron,
+	}).Info("Background jobs configuration")
 
 	if useSupabaseCron {
 		// --- SUPABASE CRON MODE ---

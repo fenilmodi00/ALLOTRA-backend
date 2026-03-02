@@ -1,0 +1,37 @@
+TASK 1 VERIFICATION: Migration File Created
+=============================================
+
+File Path: .worktrees/ipo-allotment-registrar/database/migrations/0010_add_ipo_registrar_codes.sql
+
+✓ Migration Structure
+  - Wrapped in BEGIN; ... COMMIT; transaction block
+  - Clear purpose comment at top
+
+✓ Table: ipo_registrar_codes
+  - id UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  - ipo_id UUID NOT NULL REFERENCES ipo_list(id) ON DELETE CASCADE
+  - registrar_short_code VARCHAR(20) NOT NULL
+  - registrar_company_code VARCHAR(100) [nullable]
+  - ipo_name VARCHAR(255) [nullable]
+  - match_score FLOAT DEFAULT 0
+  - is_resolved BOOLEAN DEFAULT false
+  - last_attempted_at TIMESTAMP [nullable]
+  - created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  - updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+✓ Constraints
+  - UNIQUE constraint on (ipo_id, registrar_short_code)
+  - Named: uq_ipo_registrar_codes_ipo_id_registrar_short_code
+  - Foreign key to ipo_list(id) with ON DELETE CASCADE
+
+✓ Indexes
+  1. idx_ipo_registrar_codes_ipo_id_registrar_short_code on (ipo_id, registrar_short_code)
+  2. idx_ipo_registrar_codes_is_resolved_last_attempted_at on (is_resolved, last_attempted_at)
+
+✓ SQL Syntax
+  - Valid PostgreSQL syntax
+  - Uses uuid-ossp (gen_random_uuid) - compatible with existing schema
+  - FLOAT type for match_score (compatible with scoring patterns)
+  - TIMESTAMP types for audit fields (consistent with ipo_list pattern)
+
+VERIFICATION COMPLETE: All specifications met.

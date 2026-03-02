@@ -1,0 +1,23 @@
+KFin API listing endpoint discovery evidence
+Timestamp: 2026-03-02
+
+Base API URL
+- https://0uz601ms56.execute-api.ap-south-1.amazonaws.com/prod/api
+
+Verified from bundle
+- https://ipostatus.kfintech.com/static/js/main.7e125d95.js contains only:
+  https://0uz601ms56.execute-api.ap-south-1.amazonaws.com/prod/api/query?type=
+
+Playwright network inspection
+- Loaded https://ipostatus.kfintech.com/
+- Observed network: page + static assets only
+- No XHR/fetch request for IPO list observed when opening "Select IPO" dropdown
+
+Candidate listing endpoints tested (GET/POST)
+- /ipolist -> 403 MissingAuthenticationTokenException
+- /ipo -> 403 MissingAuthenticationTokenException
+- /list -> 403 MissingAuthenticationTokenException
+
+Conclusion
+- No public dedicated listing API endpoint was discoverable.
+- Frontend currently embeds IPO options in JS bundle constant (JSON.parse payload), and only uses /query API for allotment lookup.

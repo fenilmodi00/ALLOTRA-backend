@@ -1,0 +1,32 @@
+Task 7 Build and Test Evidence
+Date: 2026-03-02
+
+1) go build ./...
+Command: go build ./...
+Result: PASS (exit code 0)
+Output: <no output>
+
+2) go test ./...
+Command: go test ./...
+Result: PASS (exit code 0)
+Output:
+?    github.com/fenilmodi00/ipo-backend [no test files]
+?    github.com/fenilmodi00/ipo-backend/config [no test files]
+?    github.com/fenilmodi00/ipo-backend/database [no test files]
+ok   github.com/fenilmodi00/ipo-backend/handlers (cached)
+ok   github.com/fenilmodi00/ipo-backend/internal/app 1.073s
+ok   github.com/fenilmodi00/ipo-backend/jobs (cached)
+ok   github.com/fenilmodi00/ipo-backend/models (cached)
+?    github.com/fenilmodi00/ipo-backend/repositories [no test files]
+ok   github.com/fenilmodi00/ipo-backend/services 1.593s
+ok   github.com/fenilmodi00/ipo-backend/shared (cached)
+ok   github.com/fenilmodi00/ipo-backend/tests 1.011s
+?    github.com/fenilmodi00/ipo-backend/tools/registrars [no test files]
+?    github.com/fenilmodi00/ipo-backend/tools/registrars/bigshare [no test files]
+ok   github.com/fenilmodi00/ipo-backend/tools/registrars/kfin (cached)
+?    github.com/fenilmodi00/ipo-backend/tools/registrars/mufg [no test files]
+
+3) lsp diagnostics check
+Command: lsp_diagnostics on main.go
+Result: BLOCKED
+Output: 'gopls' is not recognized as an internal or external command.

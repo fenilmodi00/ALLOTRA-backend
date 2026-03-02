@@ -1,0 +1,26 @@
+{
+  "task": "task-4-allotment-check",
+  "file": "handlers/v2_allotment_handler.go",
+  "verification": {
+    "handler_compile": {
+      "command": "go test ./handlers/...",
+      "status": "passed",
+      "output": "ok github.com/fenilmodi00/ipo-backend/handlers 1.432s"
+    },
+    "repo_build": {
+      "command": "go build ./...",
+      "status": "failed",
+      "error": "internal/app/server.go:111:82: not enough arguments in call to handlers.NewAdminHandler"
+    },
+    "lsp_diagnostics": {
+      "status": "unavailable",
+      "error": "gopls not found in environment"
+    }
+  },
+  "result_mapping": {
+    "status": "allotmentResult.Status -> response.Status",
+    "shares_applied": "allotmentResult.SharesApplied -> response.SharesApplied",
+    "shares_allotted": "allotmentResult.SharesAllotted -> response.SharesAllotted",
+    "application_number_cache": "allotmentResult.ApplicationNo -> models.IPOResultCache.ApplicationNumber"
+  }
+}

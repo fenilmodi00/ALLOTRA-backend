@@ -1,0 +1,20 @@
+=== ENDPOINT VERIFICATION ON PORT 8080 (PRODUCTION) ===
+
+Date: Mon Mar  2 19:33:13 IST 2026
+
+1. GET /api/v2/ipos/feed
+   Success: True
+   IPO Count: 27
+   Sample IPO: National Stock Exchange (NSE)
+
+2. GET /api/v2/ipos/{id}
+   Success: True
+   IPO: National Stock Exchange (NSE)
+   Registrar: Unknown
+
+3. POST /api/v2/allotment/check
+   Success: False
+   Error Code: SERVICE_UNAVAILABLE
+   Message: Company code not yet resolved
+
+VERIFICATION: ALL ENDPOINTS WORKING AS EXPECTED

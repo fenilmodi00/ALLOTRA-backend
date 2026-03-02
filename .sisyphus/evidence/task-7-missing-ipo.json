@@ -1,0 +1,17 @@
+{
+  "task": "Task 7 missing IPO scenario",
+  "request": {
+    "method": "POST",
+    "url": "http://localhost:8080/api/v2/allotment/check",
+    "body": {
+      "ipo_id": "00000000-0000-0000-0000-000000000000",
+      "pan": "AQNPN9478L"
+    }
+  },
+  "response": {
+    "http_status": "000",
+    "stdout": "HTTP_STATUS:000",
+    "stderr": "curl: (7) Failed to connect to localhost port 8080 after ~2.2s"
+  },
+  "verdict": "blocked_server_unreachable"
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -222,33 +223,27 @@ func (s *RegistrarCodeScheduler) isCodeAlreadyResolved(ctx context.Context, ipoI
 // extractRegistrarShortCode maps full registrar name to short code
 // Supports common Indian IPO registrars
 func extractRegistrarShortCode(registrar string) string {
-	// Map full registrar names to their short codes
+	// Normalize input to lowercase for case-insensitive matching
+	lowerRegistrar := strings.ToLower(registrar)
+
+	// Map full registrar names to their short codes (all keys lowercase)
 	registrarMap := map[string]string{
-		"KFIN":                                        "KFIN",
-		"Kfin Technologies Limited":                   "KFIN",
-		"Kfin Technologies Pvt Ltd":                   "KFIN",
-		"Bigshare Services":                           "BIGSHARE",
-		"Bigshare Services Pvt Ltd":                   "BIGSHARE",
-		"MUFG Bank Japan Limited":                     "MUFG",
-		"Mufg Bank Japan Limited":                     "MUFG",
-		"MUFG":                                        "MUFG",
-		"Bank of India":                               "BOI",
-		"Computershare India Pvt Ltd":                 "COMPUTERSHARE",
-		"Nsdl Database Management Limited":            "NSDL",
-		"Central Depository Services (India) Limited": "CDSL",
+		"kfin":                                        "KFIN",
+		"kfin technologies limited":                   "KFIN",
+		"kfin technologies pvt ltd":                   "KFIN",
+		"bigshare services":                           "BIGSHARE",
+		"bigshare services pvt ltd":                   "BIGSHARE",
+		"mufg bank japan limited":                     "MUFG",
+		"mufg":                                        "MUFG",
+		"bank of india":                               "BOI",
+		"computershare india pvt ltd":                 "COMPUTERSHARE",
+		"nsdl database management limited":            "NSDL",
+		"central depository services (india) limited": "CDSL",
 	}
 
-	// Direct lookup
-	if code, exists := registrarMap[registrar]; exists {
+	// Direct lookup with normalized key
+	if code, exists := registrarMap[lowerRegistrar]; exists {
 		return code
-	}
-
-	// Case-insensitive partial matching for common names
-	lowerRegistrar := registrar
-	for fullName, shortCode := range registrarMap {
-		if lowerRegistrar == fullName {
-			return shortCode
-		}
 	}
 
 	// Fallback: return empty if not recognized

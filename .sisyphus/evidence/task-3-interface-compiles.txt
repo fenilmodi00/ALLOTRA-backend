@@ -1,0 +1,41 @@
+Task 3: RegistrarCodeRepository Interface Compilation Evidence
+================================================================
+
+Date: 2026-03-02
+Task: Add RegistrarCodeRepository interface to repositories/interfaces.go
+
+File Modified: .worktrees/ipo-allotment-registrar/repositories/interfaces.go
+
+Interface Added:
+----------------
+type RegistrarCodeRepository interface {
+	Upsert(ctx context.Context, code *models.RegistrarCode) error
+	GetByIPOAndRegistrar(ctx context.Context, ipoID string, registrarShortCode string) (*models.RegistrarCode, error)
+	GetUnresolvedByResultDate(ctx context.Context, date time.Time) ([]*models.RegistrarCode, error)
+}
+
+Compilation Result:
+-------------------
+Command: go build -v ./repositories/
+Output: github.com/fenilmodi00/ipo-backend/repositories
+Status: SUCCESS ✓
+
+The interface compiles successfully with no errors.
+
+Changes Made:
+--------------
+1. Added "time" import to the import block
+2. Added RegistrarCodeRepository interface with 3 methods
+3. All methods follow project conventions:
+   - Use context.Context for first parameter
+   - Return errors for proper error handling
+   - Use correct type references (models.RegistrarCode, time.Time)
+
+Verification:
+--------------
+✓ Interface added to correct file location
+✓ 3 methods as specified in requirements
+✓ Proper imports (time and context)
+✓ go build compiles successfully
+✓ No syntax errors
+✓ Follows existing interface patterns in file

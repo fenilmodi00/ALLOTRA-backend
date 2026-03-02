@@ -1,0 +1,14 @@
+{
+  "task": "task-4-unknown-registrar",
+  "scenario": "registrar client cannot be resolved from registrarShortCode",
+  "implementation": {
+    "location": "handlers/v2_allotment_handler.go",
+    "check": "client := registrars.GetClient(registrarShortCode)",
+    "response": {
+      "http_status": 503,
+      "error_code": "SERVICE_UNAVAILABLE",
+      "message": "Unsupported registrar: <shortCode>"
+    }
+  },
+  "status": "implemented"
+}

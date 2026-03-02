@@ -1,0 +1,17 @@
+{
+  "task": "Task 7 invalid PAN scenario",
+  "request": {
+    "method": "POST",
+    "url": "http://localhost:8080/api/v2/allotment/check",
+    "body": {
+      "ipo_id": "f6e09b37-5128-4ba1-b220-93818096f366",
+      "pan": "invalid"
+    }
+  },
+  "response": {
+    "http_status": "000",
+    "stdout": "HTTP_STATUS:000",
+    "stderr": "curl: (7) Failed to connect to localhost port 8080 after ~2.2s"
+  },
+  "verdict": "blocked_server_unreachable"
+}

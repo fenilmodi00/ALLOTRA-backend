@@ -8,6 +8,7 @@ import (
 	"github.com/fenilmodi00/ipo-backend/jobs"
 	"github.com/fenilmodi00/ipo-backend/models"
 	"github.com/fenilmodi00/ipo-backend/repositories"
+	"github.com/fenilmodi00/ipo-backend/services"
 	"github.com/gofiber/fiber/v2"
 	"github.com/sirupsen/logrus"
 )
@@ -27,18 +28,22 @@ type GMPHistoryJobRunner interface {
 }
 
 type AdminHandler struct {
-	GMPRepo       repositories.GMPRepository
-	IPOService    IPOAdminService
-	GMPJob        GMPJobRunner
-	GMPHistoryJob GMPHistoryJobRunner
+	GMPRepo              repositories.GMPRepository
+	IPOService           IPOAdminService
+	GMPJob               GMPJobRunner
+	GMPHistoryJob        GMPHistoryJobRunner
+	DailyJob             GMPJobRunner // Daily IPO update (Chittorgarh + Groww)
+	RegistrarCodeService *services.RegistrarCodeService
 }
 
-func NewAdminHandler(db *sql.DB, ipoService IPOAdminService, gmpJob GMPJobRunner, gmpHistoryJob GMPHistoryJobRunner) *AdminHandler {
+func NewAdminHandler(db *sql.DB, ipoService IPOAdminService, gmpJob GMPJobRunner, gmpHistoryJob GMPHistoryJobRunner, dailyJob GMPJobRunner, registrarCodeService *services.RegistrarCodeService) *AdminHandler {
 	return &AdminHandler{
-		GMPRepo:       repositories.NewSQLGMPRepository(db),
-		IPOService:    ipoService,
-		GMPJob:        gmpJob,
-		GMPHistoryJob: gmpHistoryJob,
+		GMPRepo:              repositories.NewSQLGMPRepository(db),
+		IPOService:           ipoService,
+		GMPJob:               gmpJob,
+		GMPHistoryJob:        gmpHistoryJob,
+		DailyJob:             dailyJob,
+		RegistrarCodeService: registrarCodeService,
 	}
 }
 
@@ -97,6 +102,31 @@ func (h *AdminHandler) TriggerGMPUpdate(c *fiber.Ctx) error {
 	})
 }
 
+// TriggerDailyUpdate manually triggers the daily IPO update job (Chittorgarh + Groww)
+func (h *AdminHandler) TriggerDailyUpdate(c *fiber.Ctx) error {
+	if h.DailyJob == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"success": false,
+			"error":   "Daily update job unavailable",
+		})
+	}
+
+	logrus.Info("Manual daily IPO update triggered via admin endpoint")
+
+	startTime := time.Now()
+
+	// Run the daily IPO update job
+	h.DailyJob.Run()
+
+	duration := time.Since(startTime)
+
+	return c.JSON(fiber.Map{
+		"success":   true,
+		"message":   "Daily IPO update job completed",
+		"duration":  duration.String(),
+		"timestamp": time.Now(),
+	})
+}
 // GetGMPData returns all GMP data in the database for debugging
 func (h *AdminHandler) GetGMPData(c *fiber.Ctx) error {
 	if h.GMPRepo == nil {
@@ -202,6 +232,30 @@ func (h *AdminHandler) GetGMPHistoryJobMetrics(c *fiber.Ctx) error {
 			"error_summary":           metrics.ErrorSummary,
 		},
 	})
+}
+
+// TriggerRegistrarResolve manually triggers registrar code resolution for today's unresolved codes
+func (h *AdminHandler) TriggerRegistrarResolve(c *fiber.Ctx) error {
+	if h.RegistrarCodeService == nil {
+		return c.Status(503).JSON(fiber.Map{"error": "registrar code service not available"})
+	}
+	start := time.Now()
+	codes, err := h.RegistrarCodeService.GetUnresolvedForToday(c.Context())
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	resolved := 0
+	for _, code := range codes {
+		if code.IPOName == nil {
+			logrus.WithField("ipo_id", code.IPOID).Warn("Skipping code with nil IPO name")
+			continue
+		}
+		_, err := h.RegistrarCodeService.ResolveCode(c.Context(), code.IPOID, code.RegistrarShortCode, *code.IPOName)
+		if err == nil {
+			resolved++
+		}
+	}
+	return c.JSON(fiber.Map{"success": true, "resolved_count": resolved, "total": len(codes), "duration": time.Since(start).String()})
 }
 
 // ─────────────────────────────────────────────

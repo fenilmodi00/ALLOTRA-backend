@@ -57,6 +57,12 @@ func FetchRegistrarCodeJobExecutor(
 		// Get current time in IST
 		istNow := time.Now().In(istLocation)
 
+		// Check if result_date is set (nil check)
+		if ipo.ResultDate == nil {
+			logger.WithField("ipo_name", payload.IPOName).Info("Skipping IPO: no result_date set")
+			return nil
+		}
+
 		// Check if result_date is today
 		resultDateIST := ipo.ResultDate.In(istLocation)
 		todayIST := istNow.Truncate(24 * time.Hour)

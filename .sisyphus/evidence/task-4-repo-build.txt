@@ -1,0 +1,31 @@
+Task 4: Repository Implementation - Build Evidence
+==================================================
+
+File Created: .worktrees/ipo-allotment-registrar/repositories/registrar_code_repository.go
+
+Build Command: go build -v ./repositories/
+Build Status: SUCCESS
+
+Implementation Details:
+- PostgresRegistrarCodeRepository struct with db *sql.DB field
+- Constructor: NewPostgresRegistrarCodeRepository(db *sql.DB)
+- Method 1: Upsert(ctx context.Context, code *models.RegistrarCode) error
+  - Uses INSERT ON CONFLICT (ipo_id, registrar_short_code) DO UPDATE pattern
+  - Inserts/updates all fields including match_score, is_resolved, last_attempted_at
+- Method 2: GetByIPOAndRegistrar(ctx context.Context, ipoID string, registrarShortCode string) (*models.RegistrarCode, error)
+  - Simple WHERE clause with 2 parameters
+  - Returns ErrNotFound for sql.ErrNoRows
+- Method 3: GetUnresolvedByResultDate(ctx context.Context, date time.Time) ([]*models.RegistrarCode, error)
+  - JOINs registrar_codes with ipo_list
+  - Filters WHERE is_resolved = false AND DATE(result_date) = DATE($1)
+  - Returns slice of unresolved registrar codes
+
+All methods use:
+- context.WithTimeout(ctx, 5*time.Second) for database operations
+- Proper error handling with fmt.Errorf wrapping
+- database/sql with ExecContext/QueryRowContext/QueryContext
+- Consistent error handling pattern from gmp_repository.go
+
+Compilation: ✓ SUCCESSFUL
+All 3 interface methods implemented: ✓
+Data access only, no business logic: ✓

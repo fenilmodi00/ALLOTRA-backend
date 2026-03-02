@@ -1,0 +1,35 @@
+{
+  "test": "Admin authentication for /api/v2/admin/registrar/resolve",
+  "status": "inherited",
+  "authentication_flow": {
+    "group": "v2Admin",
+    "middleware": "adminAuthMiddleware",
+    "location": "internal/app/server.go:346",
+    "token_source": ["X-Admin-Token header", "Authorization: Bearer <token>"],
+    "validation": "constant-time comparison using subtle.ConstantTimeCompare"
+  },
+  "route_registration": {
+    "pattern": "v2Admin.Post(\"/registrar/resolve\", v2AdminHandler.TriggerRegistrarResolve)",
+    "line": "internal/app/server.go:354",
+    "inherits_auth": true
+  },
+  "error_responses": {
+    "no_token_configured": {
+      "status": 503,
+      "error": "Admin endpoints are disabled"
+    },
+    "missing_token": {
+      "status": 401,
+      "error": "Unauthorized"
+    },
+    "invalid_token": {
+      "status": 401,
+      "error": "Unauthorized"
+    }
+  },
+  "notes": [
+    "No additional auth added beyond group middleware",
+    "Follows same pattern as all other v2Admin endpoints",
+    "Authentication handled at group level, not endpoint level"
+  ]
+}

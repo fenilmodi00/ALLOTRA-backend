@@ -1,0 +1,49 @@
+=== DATABASE VERIFICATION FOR TASK 5 ===
+
+SERVICE IMPLEMENTATION VERIFIED:
+
+1. RegistrarCodeService Methods:
+   - GetUnresolvedForToday(ctx context.Context) ([]*models.RegistrarCode, error)
+     * Location: services/registrar_code_service.go:135
+     * Returns unresolved codes for current date
+     * Calls: repo.GetUnresolvedByResultDate(ctx, today)
+   
+   - ResolveCode(ctx context.Context, ipoID uuid.UUID, registrarShortCode string, ipoName string) (*models.RegistrarCode, error)
+     * Location: services/registrar_code_service.go:31
+     * Calls registrar client to resolve code
+     * Upserts if score >= 80.0
+
+2. Database Repository:
+   - Type: *repositories.PostgresRegistrarCodeRepository
+   - Created: internal/app/server.go:86
+   - Connection: Uses main db *sql.DB instance
+
+3. Handler Integration:
+   - AdminHandler.RegistrarCodeService field added: handlers/admin_handler.go:35
+   - Constructor updated to accept service: handlers/admin_handler.go:37
+   - Service wired in server.go: internal/app/server.go:111
+   - Passed existing registrarCodeService (line 87)
+
+4. Endpoint Flow:
+   POST /api/v2/admin/registrar/resolve
+     → v2AdminHandler.TriggerRegistrarResolve
+     → V2 response wrapper with service nil check
+     → Calls h.LegacyHandler.RegistrarCodeService methods
+     → Returns: {success: true, resolved_count: N, total: M, duration: "Xs"}
+
+5. Safety Features:
+   - Service nil check returns 503
+   - code.IPOName nil check before dereference (skips with log)
+   - Error handling per code (continues on error)
+   - Duration tracking for performance monitoring
+
+BUILD STATUS: PASS
+go build ./... completed successfully
+
+SCHEMA DEPENDENCIES:
+   - registrar_codes table (existing)
+   - ipo_name column nullable (*string in models)
+   - result_date column for filtering
+
+VERIFICATION METHOD: Code analysis
+Actual database connection test not performed (no running server/db connection)

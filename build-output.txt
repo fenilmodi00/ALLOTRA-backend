@@ -1,0 +1,2 @@
+services\registrar_code_service.go:11:2: no required module provides package github.com/fenilmodi00/ipo-backend/tools/registrars; to add it:
+	go get github.com/fenilmodi00/ipo-backend/tools/registrars

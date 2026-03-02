@@ -1,0 +1,44 @@
+{
+  "task": "Task 7 E2E allotment flow",
+  "timestamp": "2026-03-02",
+  "precheck": {
+    "admin_token_env": "present",
+    "server_health_http_status": "000",
+    "server_start_attempt": "failed",
+    "server_start_error": "failed to connect to database: dial tcp [::1]:5432 connect refused",
+    "docker_status": "unavailable",
+    "docker_error": "failed to connect to docker API at npipe //./pipe/dockerDesktopLinuxEngine"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": "start server and check /api/v2/ipos/feed",
+      "result": "failed",
+      "details": "curl returned HTTP_STATUS:000; server process exited on DB connection refusal"
+    },
+    {
+      "step": 2,
+      "action": "trigger POST /api/v2/admin/registrar/resolve",
+      "result": "failed",
+      "details": "curl returned HTTP_STATUS:000 (localhost:8080 unreachable)"
+    },
+    {
+      "step": 3,
+      "action": "verify ipo_registrar_codes row via docker exec psql",
+      "result": "failed",
+      "details": "docker daemon unavailable; psql command could not execute"
+    },
+    {
+      "step": 4,
+      "action": "call POST /api/v2/allotment/check (Accord IPO + PAN AQNPN9478L)",
+      "result": "failed",
+      "details": "curl returned HTTP_STATUS:000 (localhost:8080 unreachable)"
+    }
+  ],
+  "raw_outputs": {
+    "admin_resolve": "HTTP_STATUS:000; curl: (7) Failed to connect to localhost port 8080",
+    "allotment_check": "HTTP_STATUS:000; curl: (7) Failed to connect to localhost port 8080",
+    "db_query": "failed to connect to docker API at npipe //./pipe/dockerDesktopLinuxEngine"
+  },
+  "verdict": "blocked_by_environment"
+}
