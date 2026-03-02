@@ -16,6 +16,7 @@ import (
 	"github.com/fenilmodi00/ipo-backend/database"
 	"github.com/fenilmodi00/ipo-backend/handlers"
 	"github.com/fenilmodi00/ipo-backend/jobs"
+	"github.com/fenilmodi00/ipo-backend/repositories"
 	"github.com/fenilmodi00/ipo-backend/services"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -77,6 +78,8 @@ func Run(cfg *config.Config) error {
 	scrapingService := services.NewChittorgarhIPOScrapingService(nil)
 	allotmentChecker := services.NewAllotmentChecker()
 	ipoService := services.NewIPOService(db)
+	registrarCodeRepo := repositories.NewPostgresRegistrarCodeRepository(db)
+	registrarCodeService := services.NewRegistrarCodeService(db, registrarCodeRepo)
 
 	cacheService := services.NewCacheServiceWithConfig(
 		db,
@@ -133,11 +136,11 @@ func Run(cfg *config.Config) error {
 	defer stopBackgroundJobs()
 	var backgroundWG sync.WaitGroup
 
-	startBackgroundJobs(backgroundCtx, &backgroundWG, dailyJob, resultJob, cleanupJob, gmpJob, gmpHistoryJob, db)
+	startBackgroundJobs(backgroundCtx, &backgroundWG, dailyJob, resultJob, cleanupJob, gmpJob, gmpHistoryJob, db, ipoService, registrarCodeService)
 
 	app := fiber.New(fiber.Config{BodyLimit: 4 * 1024 * 1024})
 	registerMiddleware(app, cfg)
-	registerRoutes(app, db, cfg, redisClient, ipoHandler, cacheHandler, adminHandler, checkHandler, marketHandler, gmpHandler, gmpHistoryHandler, performanceHandler, ipoService, allotmentChecker, cacheService)
+	registerRoutes(app, db, cfg, redisClient, ipoHandler, cacheHandler, adminHandler, checkHandler, marketHandler, gmpHandler, gmpHistoryHandler, performanceHandler, ipoService, allotmentChecker, cacheService, registrarCodeService)
 
 	serverErrors := make(chan error, 1)
 	go func() {
@@ -209,6 +212,7 @@ func registerRoutes(
 	ipoService *services.IPOService,
 	allotmentChecker *services.AllotmentChecker,
 	cacheService *services.CacheService,
+	registrarCodeService *services.RegistrarCodeService,
 ) {
 	app.Get("/health", func(c *fiber.Ctx) error {
 		pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -321,7 +325,7 @@ func registerRoutes(
 	v2IpoHandler := handlers.NewV2IPOHandler(ipoService)
 	v2GmpHistoryHandler := handlers.NewV2GMPHistoryHandler(gmpHistoryHandler)
 	v2AdminHandler := handlers.NewV2AdminHandler(adminHandler)
-	v2AllotmentHandler := handlers.NewV2AllotmentHandler(ipoService, services.NewAllotmentChecker(), cacheService)
+	v2AllotmentHandler := handlers.NewV2AllotmentHandler(ipoService, services.NewAllotmentChecker(), cacheService, registrarCodeService)
 
 	// V2 Public API Group (root level /api/v2)
 	v2 := app.Group("/api/v2")
@@ -415,6 +419,8 @@ func startBackgroundJobs(
 	gmpJob jobRunner,
 	gmpHistoryJob jobRunner,
 	db *sql.DB,
+	ipoService *services.IPOService,
+	registrarCodeService *services.RegistrarCodeService,
 ) {
 	useSupabaseCron := os.Getenv("USE_SUPABASE_CRON") == "true"
 
@@ -452,8 +458,11 @@ func startBackgroundJobs(
 			safeJobRun("cache_cleanup", cleanupJob.Run)
 			return nil
 		})
+		poller.RegisterExecutor("fetch_registrar_company_code", jobs.FetchRegistrarCodeJobExecutor(registrarCodeService, ipoService))
 
 		poller.Start()
+		registrarCodeScheduler := jobs.NewRegistrarCodeScheduler(db, 30*time.Minute)
+		registrarCodeScheduler.Start()
 
 		wg.Add(1)
 		go func() {
