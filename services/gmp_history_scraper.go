@@ -1064,7 +1064,7 @@ exactMatch:
 		}).Warn("Multiple name similarity matches - rejecting ambiguous match")
 	}
 
-	return "", fmt.Errorf("no matching IPO found in InvestorGain API URL list for %s (%s)", ipoName, companyCode)
+	return "", NewGMPHistoryError(FailureTypeNOIGID, fmt.Sprintf("IPO %s (%s): not found in InvestorGain API URL list", ipoName, companyCode), nil)
 }
 
 // findNumericIDWithMultipleStrategies tries multiple matching approaches
@@ -1109,7 +1109,7 @@ func (s *GMPPriceHistoryScraper) findNumericIDWithMultipleStrategies(htmlContent
 		return numericID, nil
 	}
 
-	return "", fmt.Errorf("no matching IPO found on InvestorGain listing page for %s (%s)", ipoName, companyCode)
+	return "", NewGMPHistoryError(FailureTypeNOIGID, fmt.Sprintf("IPO %s (%s): not found on InvestorGain listing page", ipoName, companyCode), nil)
 }
 
 // findByExactCompanyCode finds IPO by exact company code match
