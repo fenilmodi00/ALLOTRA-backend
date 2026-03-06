@@ -153,6 +153,20 @@ func (s *RegistrarCodeScheduler) scheduleRegistrarCodeJobs() {
 			continue
 		}
 
+		// Check for existing pending/running jobs to avoid duplicates
+		hasExistingJob, err := s.hasPendingJob(ctx, ipo.ID)
+		if err != nil {
+			logrus.WithError(err).WithField("ipo_id", ipo.ID.String()).Warn("Failed to check for existing jobs")
+			continue
+		}
+		if hasExistingJob {
+			logrus.WithFields(logrus.Fields{
+				"ipo_id":   ipo.ID.String(),
+				"ipo_name": ipo.Name,
+			}).Debug("Pending job already exists, skipping")
+			continue
+		}
+
 		// Create payload
 		payload := FetchRegistrarCodePayload{
 			IPOID:              ipo.ID,
@@ -220,6 +234,24 @@ func (s *RegistrarCodeScheduler) isCodeAlreadyResolved(ctx context.Context, ipoI
 	return count > 0, nil
 }
 
+// hasPendingJob checks if there's already a pending or running job for this IPO
+func (s *RegistrarCodeScheduler) hasPendingJob(ctx context.Context, ipoID uuid.UUID) (bool, error) {
+	query := `
+		SELECT COUNT(*) 
+		FROM job_dispatch 
+		WHERE job_type = 'fetch_registrar_company_code' 
+		  AND status IN ('pending', 'running')
+		  AND payload->>'ipo_id' = $1
+	`
+
+	var count int
+	err := s.db.QueryRowContext(ctx, query, ipoID.String()).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 // extractRegistrarShortCode maps full registrar name to short code
 // Supports common Indian IPO registrars
 func extractRegistrarShortCode(registrar string) string {
@@ -244,6 +276,16 @@ func extractRegistrarShortCode(registrar string) string {
 	// Direct lookup with normalized key
 	if code, exists := registrarMap[lowerRegistrar]; exists {
 		return code
+	}
+
+	// Fuzzy matching: use strings.Contains for partial matches
+	switch {
+	case strings.Contains(lowerRegistrar, "bigshare"):
+		return "BIGSHARE"
+	case strings.Contains(lowerRegistrar, "mufg") || strings.Contains(lowerRegistrar, "intime") || strings.Contains(lowerRegistrar, "link"):
+		return "MUFG"
+	case strings.Contains(lowerRegistrar, "kfin") || strings.Contains(lowerRegistrar, "kfintech"):
+		return "KFIN"
 	}
 
 	// Fallback: return empty if not recognized

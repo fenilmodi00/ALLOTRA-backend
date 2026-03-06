@@ -63,10 +63,10 @@ func FetchRegistrarCodeJobExecutor(
 			return nil
 		}
 
-		// Check if result_date is today
+		// Check if result_date is today (using explicit date construction in IST)
 		resultDateIST := ipo.ResultDate.In(istLocation)
-		todayIST := istNow.Truncate(24 * time.Hour)
-		resultDateTruncated := resultDateIST.Truncate(24 * time.Hour)
+		todayIST := time.Date(istNow.Year(), istNow.Month(), istNow.Day(), 0, 0, 0, 0, istLocation)
+		resultDateTruncated := time.Date(resultDateIST.Year(), resultDateIST.Month(), resultDateIST.Day(), 0, 0, 0, 0, istLocation)
 
 		if resultDateTruncated != todayIST {
 			logger.WithFields(logrus.Fields{

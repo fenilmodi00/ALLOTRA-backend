@@ -101,6 +101,22 @@ func (s *RegistrarCodeService) ResolveCode(ctx context.Context, ipoID uuid.UUID,
 		return nil, fmt.Errorf("upsert registrar code: %w", err)
 	}
 
+	// Write back resolved company_code to ipo_list
+	if code.IsResolved && code.RegistrarCompanyCode != nil && *code.RegistrarCompanyCode != "" {
+		updateQuery := `
+			UPDATE ipo_list 
+			SET company_code = $1, is_fetched = true, updated_at = $2
+			WHERE id = $3
+		`
+		_, err := s.db.ExecContext(ctx, updateQuery, *code.RegistrarCompanyCode, time.Now(), ipoID)
+		if err != nil {
+			logger.WithError(err).Error("Failed to update ipo_list.company_code")
+			// Don't fail - ipo_registrar_codes was already updated
+		} else {
+			logger.WithField("company_code", *code.RegistrarCompanyCode).Info("Updated ipo_list.company_code")
+		}
+	}
+
 	logger.WithFields(logrus.Fields{
 		"is_resolved":  code.IsResolved,
 		"company_code": companyCode,

@@ -1899,18 +1899,18 @@ type ChittorgarhIPOData struct {
 	CompanyName          string  `json:"company_name"`
 	IssueOpenDate        string  `json:"issue_open_date"`
 	IssueCloseDate       string  `json:"issue_close_date"`
-	IssuePriceLower      float64 `json:"issue_price_lower"`
-	IssuePriceUpper      float64 `json:"issue_price_upper"`
-	NSESymbol            string  `json:"nse_symbol"`
-	RegistrarName        string  `json:"registrar_name"`
-	TimetableListingDate string  `json:"timetable_listing_dt"`
-	TimetableResultDate  string  `json:"timetable_boa_dt"`
-	MarketLotSize        int     `json:"market_lot_size"`
-	MinimumOrderQuantity int     `json:"minimum_order_quantity"`
-	IssueSizeInAmt       string  `json:"issue_size_in_amt"`
-	URLRewriteFolderName string  `json:"urlrewrite_folder_name"`
-	Description          string  `json:"description"`
-	About                string  `json:"about"`
+	IssuePriceLower      interface{} `json:"issue_price_lower"` // Changed to interface{} to handle string/float/int
+	IssuePriceUpper      interface{} `json:"issue_price_upper"` // Changed to interface{} to handle string/float/int
+	NSESymbol            string      `json:"nse_symbol"`
+	RegistrarName        string      `json:"registrar_name"`
+	TimetableListingDate string      `json:"timetable_listing_dt"`
+	TimetableResultDate  string      `json:"timetable_boa_dt"`
+	MarketLotSize        interface{} `json:"market_lot_size"`        // Changed to interface{}
+	MinimumOrderQuantity interface{} `json:"minimum_order_quantity"` // Changed to interface{}
+	IssueSizeInAmt       string      `json:"issue_size_in_amt"`
+	URLRewriteFolderName string      `json:"urlrewrite_folder_name"`
+	Description          string      `json:"description"`
+	About                string      `json:"about"`
 }
 
 // extractIPODataFromJSON extracts IPO data from JSON embedded in the page
@@ -2097,11 +2097,11 @@ func (service *ChittorgarhIPOScrapingService) convertChittorgarhDataToIPO(data C
 	}
 
 	// Set price band
-	if data.IssuePriceLower > 0 {
-		ipo.PriceBandLow = &data.IssuePriceLower
+	if lowerPrice, ok := parseFloatFromInterface(data.IssuePriceLower); ok && lowerPrice > 0 {
+		ipo.PriceBandLow = &lowerPrice
 	}
-	if data.IssuePriceUpper > 0 {
-		ipo.PriceBandHigh = &data.IssuePriceUpper
+	if upperPrice, ok := parseFloatFromInterface(data.IssuePriceUpper); ok && upperPrice > 0 {
+		ipo.PriceBandHigh = &upperPrice
 	}
 
 	// Set dates
@@ -2119,11 +2119,11 @@ func (service *ChittorgarhIPOScrapingService) convertChittorgarhDataToIPO(data C
 	}
 
 	// Set lot size and minimum amount
-	if data.MarketLotSize > 0 {
-		ipo.MinQty = &data.MarketLotSize
+	if lotSize, ok := parseIntFromInterface(data.MarketLotSize); ok && lotSize > 0 {
+		ipo.MinQty = &lotSize
 	}
-	if data.MinimumOrderQuantity > 0 && ipo.MinQty == nil {
-		ipo.MinQty = &data.MinimumOrderQuantity
+	if minOrder, ok := parseIntFromInterface(data.MinimumOrderQuantity); ok && minOrder > 0 && ipo.MinQty == nil {
+		ipo.MinQty = &minOrder
 	}
 
 	// Calculate minimum amount
@@ -2236,11 +2236,11 @@ func (service *ChittorgarhIPOScrapingService) convertChittorgarhDataToIPOWithLog
 	}
 
 	// Set price band
-	if data.IssuePriceLower > 0 {
-		ipo.PriceBandLow = &data.IssuePriceLower
+	if lowerPrice, ok := parseFloatFromInterface(data.IssuePriceLower); ok && lowerPrice > 0 {
+		ipo.PriceBandLow = &lowerPrice
 	}
-	if data.IssuePriceUpper > 0 {
-		ipo.PriceBandHigh = &data.IssuePriceUpper
+	if upperPrice, ok := parseFloatFromInterface(data.IssuePriceUpper); ok && upperPrice > 0 {
+		ipo.PriceBandHigh = &upperPrice
 	}
 	if ipo.PriceBandLow != nil && ipo.PriceBandHigh != nil {
 		logger.WithFields(logrus.Fields{
@@ -2264,11 +2264,11 @@ func (service *ChittorgarhIPOScrapingService) convertChittorgarhDataToIPOWithLog
 	}
 
 	// Set lot size and minimum amount
-	if data.MarketLotSize > 0 {
-		ipo.MinQty = &data.MarketLotSize
+	if lotSize, ok := parseIntFromInterface(data.MarketLotSize); ok && lotSize > 0 {
+		ipo.MinQty = &lotSize
 	}
-	if data.MinimumOrderQuantity > 0 && ipo.MinQty == nil {
-		ipo.MinQty = &data.MinimumOrderQuantity
+	if minOrder, ok := parseIntFromInterface(data.MinimumOrderQuantity); ok && minOrder > 0 && ipo.MinQty == nil {
+		ipo.MinQty = &minOrder
 	}
 
 	// Calculate minimum amount
@@ -2381,6 +2381,63 @@ func (service *ChittorgarhIPOScrapingService) convertChittorgarhDataToIPOWithLog
 	}).Debug("Completed conversion from JSON to IPO model")
 
 	return ipo, nil
+}
+
+// parseFloatFromInterface safely extracts a float64 from an interface{} which could be string, float64, etc.
+func parseFloatFromInterface(val interface{}) (float64, bool) {
+	if val == nil {
+		return 0, false
+	}
+	switch v := val.(type) {
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case string:
+		if v == "" || v == "-" || v == "NA" || v == "N/A" {
+			return 0, false
+		}
+		f, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return 0, false
+		}
+		return f, true
+	default:
+		return 0, false
+	}
+}
+
+// parseIntFromInterface safely extracts an int from an interface{} which could be string, float64, etc.
+func parseIntFromInterface(val interface{}) (int, bool) {
+	if val == nil {
+		return 0, false
+	}
+	switch v := val.(type) {
+	case int:
+		return v, true
+	case float64:
+		return int(v), true
+	case string:
+		if v == "" || v == "-" || v == "NA" || v == "N/A" {
+			return 0, false
+		}
+		i, err := strconv.Atoi(v)
+		if err != nil {
+			// Sometimes string ints are floats: "100.0"
+			f, errF := strconv.ParseFloat(v, 64)
+			if errF == nil {
+				return int(f), true
+			}
+			return 0, false
+		}
+		return i, true
+	default:
+		return 0, false
+	}
 }
 
 // parseChittorgarhDate parses dates in Chittorgarh format
