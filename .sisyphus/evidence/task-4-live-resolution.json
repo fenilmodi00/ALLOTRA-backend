@@ -1,0 +1,13 @@
+{
+  "task": "task-4-live-resolution",
+  "scenario": "resolvedCode exists but RegistrarCompanyCode is nil or empty",
+  "implementation": {
+    "location": "handlers/v2_allotment_handler.go",
+    "behavior": [
+      "If RegistrarCompanyCode is nil/empty, call RegistrarCodeService.ResolveCode once",
+      "If unresolved after retry, return 503 SERVICE_UNAVAILABLE",
+      "If resolved, proceed to registrar client CheckAllotment"
+    ]
+  },
+  "status": "implemented"
+}

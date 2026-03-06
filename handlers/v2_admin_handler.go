@@ -38,6 +38,27 @@ func (h *V2AdminHandler) TriggerGMPUpdate(c *fiber.Ctx) error {
 	return c.JSON(shared.NewV2Response(data))
 }
 
+// TriggerDailyUpdate wraps the v1 daily update trigger in a v2 response envelope
+func (h *V2AdminHandler) TriggerDailyUpdate(c *fiber.Ctx) error {
+	if h.LegacyHandler.DailyJob == nil {
+		return c.Status(503).JSON(shared.NewV2ErrorResponse("SERVICE_UNAVAILABLE", "Daily update job unavailable", nil))
+	}
+
+	startTime := time.Now()
+
+	// Run the daily IPO update job
+	h.LegacyHandler.DailyJob.Run()
+
+	duration := time.Since(startTime)
+
+	data := map[string]interface{}{
+		"message":  "Daily IPO update job completed",
+		"duration": duration.String(),
+	}
+
+	return c.JSON(shared.NewV2Response(data))
+}
+
 // TriggerGMPHistoryUpdate wraps the v1 GMP history update trigger in a v2 response envelope
 func (h *V2AdminHandler) TriggerGMPHistoryUpdate(c *fiber.Ctx) error {
 	if h.LegacyHandler.GMPHistoryJob == nil {
@@ -119,4 +140,36 @@ func (h *V2AdminHandler) GetGMPData(c *fiber.Ctx) error {
 		return err
 	}
 	return nil
+}
+
+// TriggerRegistrarResolve wraps the v1 registrar code resolution in a v2 response envelope
+func (h *V2AdminHandler) TriggerRegistrarResolve(c *fiber.Ctx) error {
+	if h.LegacyHandler.RegistrarCodeService == nil {
+		return c.Status(503).JSON(shared.NewV2ErrorResponse("SERVICE_UNAVAILABLE", "Registrar code service unavailable", nil))
+	}
+
+	start := time.Now()
+	codes, err := h.LegacyHandler.RegistrarCodeService.GetUnresolvedForToday(c.Context())
+	if err != nil {
+		return c.Status(500).JSON(shared.NewV2ErrorResponse("INTERNAL_ERROR", err.Error(), nil))
+	}
+
+	resolved := 0
+	for _, code := range codes {
+		if code.IPOName == nil {
+			continue
+		}
+		_, err := h.LegacyHandler.RegistrarCodeService.ResolveCode(c.Context(), code.IPOID, code.RegistrarShortCode, *code.IPOName)
+		if err == nil {
+			resolved++
+		}
+	}
+
+	data := map[string]interface{}{
+		"resolved_count": resolved,
+		"total":          len(codes),
+		"duration":       time.Since(start).String(),
+	}
+
+	return c.JSON(shared.NewV2Response(data))
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/fenilmodi00/ipo-backend/database"
 	"github.com/fenilmodi00/ipo-backend/handlers"
 	"github.com/fenilmodi00/ipo-backend/jobs"
+	"github.com/fenilmodi00/ipo-backend/repositories"
 	"github.com/fenilmodi00/ipo-backend/services"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -55,17 +56,22 @@ func Run(cfg *config.Config) error {
 		logrus.WithError(err).Error("Goose migrations failed, continuing with existing schema")
 	}
 
-	redisOpt, err := redis.ParseURL(cfg.RedisURL)
-	if err != nil {
-		return fmt.Errorf("failed to parse REDIS_URL: %w", err)
-	}
-	redisClient := redis.NewClient(redisOpt)
-	defer redisClient.Close()
+	var redisClient *redis.Client
+	if cfg.RedisURL != "" {
+		redisOpt, err := redis.ParseURL(cfg.RedisURL)
+		if err != nil {
+			return fmt.Errorf("failed to parse REDIS_URL: %w", err)
+		}
+		redisClient = redis.NewClient(redisOpt)
+		defer redisClient.Close()
 
-	if err := redisClient.Ping(context.Background()).Err(); err != nil {
-		logrus.WithError(err).Warn("Redis ping failed, cache operations may fail")
+		if err := redisClient.Ping(context.Background()).Err(); err != nil {
+			logrus.WithError(err).Warn("Redis ping failed, cache operations may fail")
+		} else {
+			logrus.Info("Redis connected successfully")
+		}
 	} else {
-		logrus.Info("Redis connected successfully")
+		logrus.Warn("REDIS_URL not configured, using in-memory cache only")
 	}
 
 	cacheConfig := config.DefaultCacheConfig()
@@ -77,6 +83,8 @@ func Run(cfg *config.Config) error {
 	scrapingService := services.NewChittorgarhIPOScrapingService(nil)
 	allotmentChecker := services.NewAllotmentChecker()
 	ipoService := services.NewIPOService(db)
+	registrarCodeRepo := repositories.NewPostgresRegistrarCodeRepository(db)
+	registrarCodeService := services.NewRegistrarCodeService(db, registrarCodeRepo)
 
 	cacheService := services.NewCacheServiceWithConfig(
 		db,
@@ -100,7 +108,7 @@ func Run(cfg *config.Config) error {
 
 	ipoHandler := handlers.NewIPOHandler(ipoService)
 	cacheHandler := handlers.NewCacheHandler(cacheService)
-	adminHandler := handlers.NewAdminHandler(db, ipoService, gmpJob, gmpHistoryJob)
+	adminHandler := handlers.NewAdminHandler(db, ipoService, gmpJob, gmpHistoryJob, dailyJob, registrarCodeService)
 	checkHandler := handlers.NewCheckHandler(ipoService, allotmentChecker, cacheService)
 	marketHandler := handlers.NewMarketHandler()
 	gmpHandler := handlers.NewGMPHandler(db, gmpHistoryService)
@@ -133,11 +141,11 @@ func Run(cfg *config.Config) error {
 	defer stopBackgroundJobs()
 	var backgroundWG sync.WaitGroup
 
-	startBackgroundJobs(backgroundCtx, &backgroundWG, dailyJob, resultJob, cleanupJob, gmpJob, gmpHistoryJob, db)
+	startBackgroundJobs(backgroundCtx, &backgroundWG, dailyJob, resultJob, cleanupJob, gmpJob, gmpHistoryJob, db, ipoService, registrarCodeService)
 
 	app := fiber.New(fiber.Config{BodyLimit: 4 * 1024 * 1024})
 	registerMiddleware(app, cfg)
-	registerRoutes(app, db, cfg, redisClient, ipoHandler, cacheHandler, adminHandler, checkHandler, marketHandler, gmpHandler, gmpHistoryHandler, performanceHandler, ipoService, allotmentChecker, cacheService)
+	registerRoutes(app, db, cfg, redisClient, ipoHandler, cacheHandler, adminHandler, checkHandler, marketHandler, gmpHandler, gmpHistoryHandler, performanceHandler, ipoService, allotmentChecker, cacheService, registrarCodeService)
 
 	serverErrors := make(chan error, 1)
 	go func() {
@@ -209,6 +217,7 @@ func registerRoutes(
 	ipoService *services.IPOService,
 	allotmentChecker *services.AllotmentChecker,
 	cacheService *services.CacheService,
+	registrarCodeService *services.RegistrarCodeService,
 ) {
 	app.Get("/health", func(c *fiber.Ctx) error {
 		pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -311,6 +320,7 @@ func registerRoutes(
 	// V1 Admin Group
 	admin := api.Group("/admin", adminAuthMiddleware(cfg.AdminToken))
 	admin.Post("/ipos", adminHandler.CreateIPO)
+	admin.Post("/ipo/daily-update", adminHandler.TriggerDailyUpdate)
 	admin.Post("/gmp/update", adminHandler.TriggerGMPUpdate)
 	admin.Get("/gmp/data", adminHandler.GetGMPData)
 	admin.Post("/gmp-history/update", adminHandler.TriggerGMPHistoryUpdate)
@@ -321,7 +331,7 @@ func registerRoutes(
 	v2IpoHandler := handlers.NewV2IPOHandler(ipoService)
 	v2GmpHistoryHandler := handlers.NewV2GMPHistoryHandler(gmpHistoryHandler)
 	v2AdminHandler := handlers.NewV2AdminHandler(adminHandler)
-	v2AllotmentHandler := handlers.NewV2AllotmentHandler(ipoService, services.NewAllotmentChecker(), cacheService)
+	v2AllotmentHandler := handlers.NewV2AllotmentHandler(ipoService, services.NewAllotmentChecker(), cacheService, registrarCodeService)
 
 	// V2 Public API Group (root level /api/v2)
 	v2 := app.Group("/api/v2")
@@ -335,11 +345,13 @@ func registerRoutes(
 	// V2 Admin Group (within admin auth middleware)
 	v2Admin := v2.Group("/admin", adminAuthMiddleware(cfg.AdminToken))
 	v2Admin.Post("/ipos", v2AdminHandler.CreateIPO)
+	v2Admin.Post("/ipo/daily-update", v2AdminHandler.TriggerDailyUpdate)
 	v2Admin.Post("/gmp/update", v2AdminHandler.TriggerGMPUpdate)
 	v2Admin.Get("/gmp/data", v2AdminHandler.GetGMPData)
 	v2Admin.Post("/gmp-history/update", v2AdminHandler.TriggerGMPHistoryUpdate)
 	v2Admin.Get("/gmp-history/status", v2AdminHandler.GetGMPHistoryJobStatus)
 	v2Admin.Get("/gmp-history/metrics", v2AdminHandler.GetGMPHistoryJobMetrics)
+	v2Admin.Post("/registrar/resolve", v2AdminHandler.TriggerRegistrarResolve)
 
 	// Groww IPO scraper — testing & trigger endpoints
 
@@ -415,8 +427,14 @@ func startBackgroundJobs(
 	gmpJob jobRunner,
 	gmpHistoryJob jobRunner,
 	db *sql.DB,
+	ipoService *services.IPOService,
+	registrarCodeService *services.RegistrarCodeService,
 ) {
 	useSupabaseCron := os.Getenv("USE_SUPABASE_CRON") == "true"
+	logrus.WithFields(logrus.Fields{
+		"USE_SUPABASE_CRON_raw": os.Getenv("USE_SUPABASE_CRON"),
+		"useSupabaseCron":      useSupabaseCron,
+	}).Info("Background jobs configuration")
 
 	if useSupabaseCron {
 		// --- SUPABASE CRON MODE ---
@@ -452,8 +470,11 @@ func startBackgroundJobs(
 			safeJobRun("cache_cleanup", cleanupJob.Run)
 			return nil
 		})
+		poller.RegisterExecutor("fetch_registrar_company_code", jobs.FetchRegistrarCodeJobExecutor(registrarCodeService, ipoService))
 
 		poller.Start()
+		registrarCodeScheduler := jobs.NewRegistrarCodeScheduler(db, 30*time.Minute)
+		registrarCodeScheduler.Start()
 
 		wg.Add(1)
 		go func() {

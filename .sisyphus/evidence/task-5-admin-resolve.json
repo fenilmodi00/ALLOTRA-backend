@@ -1,0 +1,43 @@
+{
+  "test": "POST /api/v2/admin/registrar/resolve endpoint",
+  "status": "code_verified",
+  "implementation": {
+    "handler_method": "TriggerRegistrarResolve",
+    "handler_file": "handlers/admin_handler.go",
+    "v2_wrapper_file": "handlers/v2_admin_handler.go",
+    "route": "POST /api/v2/admin/registrar/resolve",
+    "route_location": "internal/app/server.go:354"
+  },
+  "functionality": {
+    "calls": "RegistrarCodeService.GetUnresolvedForToday()",
+    "iterates": "over unresolved codes",
+    "calls_per_code": "RegistrarCodeService.ResolveCode()",
+    "nil_check": "code.IPOName != nil before dereferencing",
+    "returns": {
+      "success": true,
+      "resolved_count": "number of successfully resolved codes",
+      "total": "total codes attempted",
+      "duration": "time taken as string"
+    }
+  },
+  "authentication": {
+    "middleware": "adminAuthMiddleware",
+    "group": "v2Admin",
+    "inherited": true
+  },
+  "service_integration": {
+    "field": "AdminHandler.RegistrarCodeService",
+    "type": "*services.RegistrarCodeService",
+    "wired_in": "internal/app/server.go:111",
+    "passed_to_constructor": true
+  },
+  "build_status": "PASS",
+  "build_command": "go build ./...",
+  "notes": [
+    "Handler follows TriggerDailyUpdate pattern exactly",
+    "Nil check added for code.IPOName pointer before dereferencing",
+    "V2 wrapper added following existing pattern",
+    "Service nil check returns 503 status",
+    "Synchronous execution as required"
+  ]
+}

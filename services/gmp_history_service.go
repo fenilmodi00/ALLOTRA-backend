@@ -15,6 +15,43 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 )
+// GMPHistoryFailureType categorizes why GMP scraping failed
+type GMPHistoryFailureType string
+
+const (
+	FailureTypeNOIGID     GMPHistoryFailureType = "NO_IG_ID"      // Could not find InvestorGain ID
+	FailureTypeNOGMPData  GMPHistoryFailureType = "NO_GMP_DATA"   // Found ID but no GMP data yet
+	FailureTypeParseError GMPHistoryFailureType = "PARSE_ERROR"   // HTML parsing failed
+	FailureTypeNetworkErr GMPHistoryFailureType = "NETWORK_ERROR" // HTTP request failed
+)
+
+// GMPHistoryError wraps errors with failure type for clearer logging
+type GMPHistoryError struct {
+	FailureType GMPHistoryFailureType
+	Message     string
+	Err         error
+}
+
+func (e *GMPHistoryError) Error() string {
+	if e.Err != nil {
+		return fmt.Sprintf("[%s] %s: %v", e.FailureType, e.Message, e.Err)
+	}
+	return fmt.Sprintf("[%s] %s", e.FailureType, e.Message)
+}
+
+func (e *GMPHistoryError) Unwrap() error {
+	return e.Err
+}
+
+// NewGMPHistoryError creates a typed error
+func NewGMPHistoryError(failureType GMPHistoryFailureType, message string, err error) *GMPHistoryError {
+	return &GMPHistoryError{
+		FailureType: failureType,
+		Message:     message,
+		Err:         err,
+	}
+}
+
 
 // GMPHistoryService handles business logic for GMP price history management
 type GMPHistoryService struct {
@@ -875,15 +912,32 @@ func (s *GMPHistoryService) ProcessAllActiveIPOHistory() (*models.ProcessingResu
 		// Scrape price history
 		collection, err := s.ScrapeIPOPriceHistoryWithNameAndStockID(ipo.ID, ipo.StockID, ipo.CompanyCode, ipo.Name)
 		if err != nil {
-			// Log error but continue processing (Requirement 4.3 - Error isolation)
-			errorMsg := fmt.Sprintf("IPO %s (%s): Failed to scrape - %v", ipo.Name, ipo.ID, err)
+			// Determine failure type and log appropriate message
+			var gmphErr *GMPHistoryError
+			failureType := "UNKNOWN"
+			message := err.Error()
+
+			if errors.As(err, &gmphErr) {
+				failureType = string(gmphErr.FailureType)
+				message = gmphErr.Message
+			}
+
+			// Categorize based on failure type
+			logLevel := logrus.WarnLevel
+			if failureType == "PARSE_ERROR" || failureType == "NETWORK_ERROR" {
+				logLevel = logrus.ErrorLevel
+			}
+
 			s.logger.WithFields(logrus.Fields{
-				"ipo_id": ipo.ID,
-				"error":  err.Error(),
-			}).Error("Failed to scrape IPO price history, continuing with next IPO")
+				"ipo_id":        ipo.ID,
+				"company_code":  ipo.CompanyCode,
+				"stock_id":      ipo.StockID,
+				"failure_type":  failureType,
+				"is_upcoming":   ipo.Status == "UPCOMING",
+			}).Logf(logLevel, "[%s] %s", failureType, message)
 
 			metrics.ErrorCount++
-			metrics.ErrorDetails = append(metrics.ErrorDetails, errorMsg)
+			metrics.ErrorDetails = append(metrics.ErrorDetails, message)
 
 			// Add to failed IPOs list
 			results.FailedIPOs = append(results.FailedIPOs, models.IPOProcessingResult{
@@ -892,7 +946,7 @@ func (s *GMPHistoryService) ProcessAllActiveIPOHistory() (*models.ProcessingResu
 				IPOName:        ipo.Name,
 				Success:        false,
 				RecordsAdded:   0,
-				ErrorMessage:   err.Error(),
+				ErrorMessage:   message,
 				ProcessingTime: time.Since(ipoStartTime),
 			})
 			results.FailureCount++
@@ -967,6 +1021,15 @@ func (s *GMPHistoryService) ProcessAllActiveIPOHistory() (*models.ProcessingResu
 	if err := s.updateJobLogOnSuccess(jobLogID, metrics); err != nil {
 		s.logger.WithError(err).Warn("Failed to update job log with final status")
 	}
+
+	// Log batch summary
+	s.logger.WithFields(logrus.Fields{
+		"total_ipos":      results.TotalProcessed,
+		"success_count":   results.SuccessCount,
+		"failure_count":   results.FailureCount,
+		"records_added":   metrics.TotalRecordsAdded,
+		"skipped_no_ig":   results.FailureCount, // These are expected for upcoming IPOs
+	}).Info("GMP History Backfill Complete")
 
 	return results, nil
 }

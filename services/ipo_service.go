@@ -12,6 +12,7 @@ import (
 
 	"github.com/fenilmodi00/ipo-backend/models"
 	"github.com/fenilmodi00/ipo-backend/shared"
+	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 )
@@ -618,17 +619,71 @@ func (s *IPOService) CalculateRiskMetrics(ipo *models.IPO) map[string]interface{
 	return riskMetrics
 }
 
+// UpsertRegistrarCompanyCode saves the discovered internal registrar code to the database
+func (s *IPOService) UpsertRegistrarCompanyCode(ctx context.Context, ipoID uuid.UUID, registrarID string, companyCode string) error {
+	query := `
+		INSERT INTO registrar_company_codes (ipo_id, registrar_id, company_code, is_fetched, updated_at)
+		VALUES ($1, $2, $3, true, NOW())
+		ON CONFLICT (ipo_id, registrar_id) 
+		DO UPDATE SET company_code = EXCLUDED.company_code, is_fetched = true, updated_at = NOW()
+	`
+	_, err := s.DB.ExecContext(ctx, query, ipoID, registrarID, companyCode)
+	if err != nil {
+		return fmt.Errorf("failed to upsert registrar company code: %w", err)
+	}
+	logrus.WithFields(logrus.Fields{
+		"ipo_id":       ipoID,
+		"registrar":    registrarID,
+		"company_code": companyCode,
+	}).Info("Successfully cached registrar company code")
+	return nil
+}
+
+// scanIPORow scans a single models.IPO from a row that implements the Scan method
+// (compatible with both *sql.Row and *sql.Rows). It also converts []byte fields to
+// json.RawMessage and calls recalculateStatus.
+func (s *IPOService) scanIPORow(row interface{ Scan(dest ...interface{}) error }) (*models.IPO, error) {
+	var ipo models.IPO
+	var formFields, formHeaders, parserConfig, strengths, risks, financials, categories, faqs, richData, growwDetails []byte
+	err := row.Scan(
+		&ipo.ID, &ipo.Name, &ipo.CompanyCode, &ipo.Description, &ipo.PriceBandLow, &ipo.PriceBandHigh,
+		&ipo.IssueSize, &ipo.OpenDate, &ipo.CloseDate, &ipo.ResultDate, &ipo.Registrar, &ipo.RegistrarID, &ipo.StockID,
+		&ipo.FormURL, &formFields, &formHeaders, &parserConfig, &ipo.Status, &ipo.SubscriptionStatus,
+		&ipo.Symbol, &ipo.Slug, &ipo.ListingDate, &ipo.ListingGain, &ipo.MinQty, &ipo.MinAmount,
+		&ipo.LogoURL, &ipo.About, &strengths, &risks, &financials, &categories, &faqs, &richData, &growwDetails, &ipo.CreatedAt, &ipo.UpdatedAt, &ipo.CreatedBy,
+	)
+	if err != nil {
+		return nil, err
+	}
+	ipo.FormFields = json.RawMessage(formFields)
+	ipo.FormHeaders = json.RawMessage(formHeaders)
+	ipo.ParserConfig = json.RawMessage(parserConfig)
+	ipo.Strengths = json.RawMessage(strengths)
+	ipo.Risks = json.RawMessage(risks)
+	ipo.Financials = json.RawMessage(financials)
+	ipo.Categories = json.RawMessage(categories)
+	ipo.FAQs = json.RawMessage(faqs)
+	ipo.RichData = json.RawMessage(richData)
+	ipo.GrowwDetails = json.RawMessage(growwDetails)
+
+	// Recalculate status based on current time
+	s.recalculateStatus(&ipo)
+
+	return &ipo, nil
+}
+
 // GetIPOsWithOptimizedQuery retrieves IPOs using optimized query patterns
 func (s *IPOService) GetIPOsWithOptimizedQuery(ctx context.Context, status string, limit, offset int) ([]models.IPO, error) {
 	limit, offset = normalizePagination(limit, offset)
 
 	// Use prepared statement for better performance
-	baseQuery := `SELECT id, name, company_code, description, price_band_low, price_band_high, 
-              issue_size, open_date, close_date, result_date, registrar, stock_id, 
-              form_url, form_fields, form_headers, parser_config, status, subscription_status,
-              symbol, slug, listing_date, listing_gain, min_qty, min_amount,
-              logo_url, about, strengths, risks, financials, categories, faqs, rich_data, groww_details, created_at, updated_at, created_by
-              FROM ipo_list`
+	// Use prepared statement for better performance
+	baseQuery := `SELECT i.id, i.name, i.company_code, i.description, i.price_band_low, i.price_band_high, 
+              i.issue_size, i.open_date, i.close_date, i.result_date, i.registrar, i.registrar_company_code, i.stock_id, 
+              i.form_url, i.form_fields, i.form_headers, i.parser_config, i.status, i.subscription_status,
+              i.symbol, i.slug, i.listing_date, i.listing_gain, i.min_qty, i.min_amount,
+              i.logo_url, i.about, i.strengths, i.risks, i.financials, i.categories, i.faqs, i.rich_data, i.groww_details, i.created_at, i.updated_at, i.created_by
+              FROM ipo_list i`
 
 	var query string
 	var args []interface{}
@@ -639,15 +694,15 @@ func (s *IPOService) GetIPOsWithOptimizedQuery(ctx context.Context, status strin
 	if status != "" && status != "all" {
 		switch status {
 		case "live":
-			conditions = append(conditions, fmt.Sprintf("status = $%d", argIndex))
+			conditions = append(conditions, fmt.Sprintf("i.status = $%d", argIndex))
 			args = append(args, models.StatusLive)
 			argIndex++
 		case "upcoming":
-			conditions = append(conditions, fmt.Sprintf("status = $%d", argIndex))
+			conditions = append(conditions, fmt.Sprintf("i.status = $%d", argIndex))
 			args = append(args, models.StatusUpcoming)
 			argIndex++
 		case "closed":
-			conditions = append(conditions, fmt.Sprintf("status IN ($%d, $%d)", argIndex, argIndex+1))
+			conditions = append(conditions, fmt.Sprintf("i.status IN ($%d, $%d)", argIndex, argIndex+1))
 			args = append(args, models.StatusClosed, models.StatusResultOut)
 			argIndex += 2
 		}
@@ -690,31 +745,10 @@ func (s *IPOService) GetIPOsWithOptimizedQuery(ctx context.Context, status strin
 
 	var ipos []models.IPO
 	for rows.Next() {
-		var ipo models.IPO
-		var formFields, formHeaders, parserConfig, strengths, risks, financials, categories, faqs, richData, growwDetails []byte
-		err := rows.Scan(
-			&ipo.ID, &ipo.Name, &ipo.CompanyCode, &ipo.Description, &ipo.PriceBandLow, &ipo.PriceBandHigh,
-			&ipo.IssueSize, &ipo.OpenDate, &ipo.CloseDate, &ipo.ResultDate, &ipo.Registrar, &ipo.StockID,
-			&ipo.FormURL, &formFields, &formHeaders, &parserConfig, &ipo.Status, &ipo.SubscriptionStatus,
-			&ipo.Symbol, &ipo.Slug, &ipo.ListingDate, &ipo.ListingGain, &ipo.MinQty, &ipo.MinAmount,
-			&ipo.LogoURL, &ipo.About, &strengths, &risks, &financials, &categories, &faqs, &richData, &growwDetails, &ipo.CreatedAt, &ipo.UpdatedAt, &ipo.CreatedBy,
-		)
+		ipo, err := s.scanIPORow(rows)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan IPO row: %w", err)
 		}
-		ipo.FormFields = json.RawMessage(formFields)
-		ipo.FormHeaders = json.RawMessage(formHeaders)
-		ipo.ParserConfig = json.RawMessage(parserConfig)
-		ipo.Strengths = json.RawMessage(strengths)
-		ipo.Risks = json.RawMessage(risks)
-		ipo.Financials = json.RawMessage(financials)
-		ipo.Categories = json.RawMessage(categories)
-		ipo.FAQs = json.RawMessage(faqs)
-		ipo.RichData = json.RawMessage(richData)
-		ipo.GrowwDetails = json.RawMessage(growwDetails)
-
-		// Recalculate status based on current time
-		s.recalculateStatus(&ipo)
 
 		if ipo.LogoURL != nil {
 			logoURL := s.UtilityService.NormalizeChittorgarhLogoURL(*ipo.LogoURL)
@@ -723,7 +757,7 @@ func (s *IPOService) GetIPOsWithOptimizedQuery(ctx context.Context, status strin
 			}
 		}
 
-		ipos = append(ipos, ipo)
+		ipos = append(ipos, *ipo)
 	}
 
 	if err = rows.Err(); err != nil {
@@ -742,7 +776,7 @@ func (s *IPOService) GetActiveIPOsPaginated(ctx context.Context, limit, offset i
 
 	// Optimized query with IN clause instead of OR - including all fields
 	query := `SELECT id, name, company_code, description, price_band_low, price_band_high, 
-              issue_size, open_date, close_date, result_date, registrar, stock_id, 
+              issue_size, open_date, close_date, result_date, registrar, registrar_id, stock_id, 
               form_url, form_fields, form_headers, parser_config, status, subscription_status,
               symbol, slug, listing_date, listing_gain, min_qty, min_amount,
               logo_url, about, strengths, risks, financials, categories, faqs, rich_data, groww_details, created_at, updated_at, created_by
@@ -756,31 +790,10 @@ func (s *IPOService) GetActiveIPOsPaginated(ctx context.Context, limit, offset i
 
 	var ipos []models.IPO
 	for rows.Next() {
-		var ipo models.IPO
-		var formFields, formHeaders, parserConfig, strengths, risks, financials, categories, faqs, richData, growwDetails []byte
-		err := rows.Scan(
-			&ipo.ID, &ipo.Name, &ipo.CompanyCode, &ipo.Description, &ipo.PriceBandLow, &ipo.PriceBandHigh,
-			&ipo.IssueSize, &ipo.OpenDate, &ipo.CloseDate, &ipo.ResultDate, &ipo.Registrar, &ipo.StockID,
-			&ipo.FormURL, &formFields, &formHeaders, &parserConfig, &ipo.Status, &ipo.SubscriptionStatus,
-			&ipo.Symbol, &ipo.Slug, &ipo.ListingDate, &ipo.ListingGain, &ipo.MinQty, &ipo.MinAmount,
-			&ipo.LogoURL, &ipo.About, &strengths, &risks, &financials, &categories, &faqs, &richData, &growwDetails, &ipo.CreatedAt, &ipo.UpdatedAt, &ipo.CreatedBy,
-		)
+		ipo, err := s.scanIPORow(rows)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan IPO row: %w", err)
 		}
-		ipo.FormFields = json.RawMessage(formFields)
-		ipo.FormHeaders = json.RawMessage(formHeaders)
-		ipo.ParserConfig = json.RawMessage(parserConfig)
-		ipo.Strengths = json.RawMessage(strengths)
-		ipo.Risks = json.RawMessage(risks)
-		ipo.Financials = json.RawMessage(financials)
-		ipo.Categories = json.RawMessage(categories)
-		ipo.FAQs = json.RawMessage(faqs)
-		ipo.RichData = json.RawMessage(richData)
-		ipo.GrowwDetails = json.RawMessage(growwDetails)
-
-		// Recalculate status based on current time
-		s.recalculateStatus(&ipo)
 
 		if ipo.LogoURL != nil {
 			logoURL := s.UtilityService.NormalizeChittorgarhLogoURL(*ipo.LogoURL)
@@ -789,7 +802,7 @@ func (s *IPOService) GetActiveIPOsPaginated(ctx context.Context, limit, offset i
 			}
 		}
 
-		ipos = append(ipos, ipo)
+		ipos = append(ipos, *ipo)
 	}
 	return ipos, nil
 }
@@ -854,43 +867,22 @@ func (s *IPOService) hasColumn(ctx context.Context, tableName, columnName string
 }
 
 func (s *IPOService) GetIPOByID(ctx context.Context, id string) (*models.IPO, error) {
-	query := `SELECT id, name, company_code, description, price_band_low, price_band_high, 
-              issue_size, open_date, close_date, result_date, registrar, stock_id, 
-              form_url, form_fields, form_headers, parser_config, status, subscription_status,
-              symbol, slug, listing_date, listing_gain, min_qty, min_amount,
-              logo_url, about, strengths, risks, financials, categories, faqs, rich_data, groww_details, created_at, updated_at, created_by
-              FROM ipo_list WHERE id = $1`
+	query := `SELECT i.id, i.name, i.company_code, i.description, i.price_band_low, i.price_band_high, 
+             i.issue_size, i.open_date, i.close_date, i.result_date, i.registrar, i.registrar_company_code, i.stock_id, 
+             i.form_url, i.form_fields, i.form_headers, i.parser_config, i.status, i.subscription_status,
+             i.symbol, i.slug, i.listing_date, i.listing_gain, i.min_qty, i.min_amount,
+             i.logo_url, i.about, i.strengths, i.risks, i.financials, i.categories, i.faqs, i.rich_data, i.groww_details, i.created_at, i.updated_at, i.created_by
+             FROM ipo_list i
+             WHERE i.id = $1`
 
 	row := s.DB.QueryRowContext(ctx, query, id)
-	var ipo models.IPO
-	var formFields, formHeaders, parserConfig, strengths, risks, financials, categories, faqs, richData, growwDetails []byte
-	err := row.Scan(
-		&ipo.ID, &ipo.Name, &ipo.CompanyCode, &ipo.Description, &ipo.PriceBandLow, &ipo.PriceBandHigh,
-		&ipo.IssueSize, &ipo.OpenDate, &ipo.CloseDate, &ipo.ResultDate, &ipo.Registrar, &ipo.StockID,
-		&ipo.FormURL, &formFields, &formHeaders, &parserConfig, &ipo.Status, &ipo.SubscriptionStatus,
-		&ipo.Symbol, &ipo.Slug, &ipo.ListingDate, &ipo.ListingGain, &ipo.MinQty, &ipo.MinAmount,
-		&ipo.LogoURL, &ipo.About, &strengths, &risks, &financials, &categories, &faqs, &richData, &growwDetails, &ipo.CreatedAt, &ipo.UpdatedAt, &ipo.CreatedBy,
-	)
+	ipo, err := s.scanIPORow(row)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to scan IPO: %w", err)
 	}
-	ipo.FormFields = json.RawMessage(formFields)
-	ipo.FormHeaders = json.RawMessage(formHeaders)
-	ipo.ParserConfig = json.RawMessage(parserConfig)
-	ipo.Strengths = json.RawMessage(strengths)
-	ipo.Risks = json.RawMessage(risks)
-	ipo.Financials = json.RawMessage(financials)
-	ipo.Categories = json.RawMessage(categories)
-	ipo.FAQs = json.RawMessage(faqs)
-	ipo.RichData = json.RawMessage(richData)
-	ipo.GrowwDetails = json.RawMessage(growwDetails)
-
-	// Recalculate status based on current time
-	s.recalculateStatus(&ipo)
-
 	if ipo.LogoURL != nil {
 		logoURL := s.UtilityService.NormalizeChittorgarhLogoURL(*ipo.LogoURL)
 		if logoURL != "" {
@@ -898,48 +890,26 @@ func (s *IPOService) GetIPOByID(ctx context.Context, id string) (*models.IPO, er
 		}
 	}
 
-	return &ipo, nil
+	return ipo, nil
 }
 
 // GetIPOByStockID returns an IPO by its stock ID
 func (s *IPOService) GetIPOByStockID(ctx context.Context, stockID string) (*models.IPO, error) {
 	query := `SELECT id, name, company_code, description, price_band_low, price_band_high, 
-              issue_size, open_date, close_date, result_date, registrar, stock_id, 
+              issue_size, open_date, close_date, result_date, registrar, registrar_id, stock_id, 
               form_url, form_fields, form_headers, parser_config, status, subscription_status,
               symbol, slug, listing_date, listing_gain, min_qty, min_amount,
               logo_url, about, strengths, risks, financials, categories, faqs, rich_data, groww_details, created_at, updated_at, created_by
               FROM ipo_list WHERE stock_id = $1`
 
 	row := s.DB.QueryRowContext(ctx, query, stockID)
-	var ipo models.IPO
-	var formFields, formHeaders, parserConfig, strengths, risks, financials, categories, faqs, richData, growwDetails []byte
-	err := row.Scan(
-		&ipo.ID, &ipo.Name, &ipo.CompanyCode, &ipo.Description, &ipo.PriceBandLow, &ipo.PriceBandHigh,
-		&ipo.IssueSize, &ipo.OpenDate, &ipo.CloseDate, &ipo.ResultDate, &ipo.Registrar, &ipo.StockID,
-		&ipo.FormURL, &formFields, &formHeaders, &parserConfig, &ipo.Status, &ipo.SubscriptionStatus,
-		&ipo.Symbol, &ipo.Slug, &ipo.ListingDate, &ipo.ListingGain, &ipo.MinQty, &ipo.MinAmount,
-		&ipo.LogoURL, &ipo.About, &strengths, &risks, &financials, &categories, &faqs, &richData, &growwDetails, &ipo.CreatedAt, &ipo.UpdatedAt, &ipo.CreatedBy,
-	)
+	ipo, err := s.scanIPORow(row)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to scan IPO: %w", err)
 	}
-	ipo.FormFields = json.RawMessage(formFields)
-	ipo.FormHeaders = json.RawMessage(formHeaders)
-	ipo.ParserConfig = json.RawMessage(parserConfig)
-	ipo.Strengths = json.RawMessage(strengths)
-	ipo.Risks = json.RawMessage(risks)
-	ipo.Financials = json.RawMessage(financials)
-	ipo.Categories = json.RawMessage(categories)
-	ipo.FAQs = json.RawMessage(faqs)
-	ipo.RichData = json.RawMessage(richData)
-	ipo.GrowwDetails = json.RawMessage(growwDetails)
-
-	// Recalculate status based on current time
-	s.recalculateStatus(&ipo)
-
 	if ipo.LogoURL != nil {
 		logoURL := s.UtilityService.NormalizeChittorgarhLogoURL(*ipo.LogoURL)
 		if logoURL != "" {
@@ -947,7 +917,7 @@ func (s *IPOService) GetIPOByStockID(ctx context.Context, stockID string) (*mode
 		}
 	}
 
-	return &ipo, nil
+	return ipo, nil
 }
 
 func (s *IPOService) CreateIPO(ctx context.Context, ipo *models.IPO) error {
@@ -993,14 +963,14 @@ func (s *IPOService) CreateIPO(ctx context.Context, ipo *models.IPO) error {
 	}
 
 	query := `INSERT INTO ipo_list (name, company_code, description, price_band_low, price_band_high, 
-              issue_size, open_date, close_date, result_date, registrar, stock_id, 
+              issue_size, open_date, close_date, result_date, registrar, registrar_id, stock_id, 
               form_url, form_fields, form_headers, parser_config, status, created_by,
               strengths, risks, financials, categories, faqs, rich_data, groww_details) 
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24) RETURNING id`
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25) RETURNING id`
 
 	err := s.DB.QueryRowContext(ctx, query,
 		ipo.Name, ipo.CompanyCode, ipo.Description, ipo.PriceBandLow, ipo.PriceBandHigh,
-		ipo.IssueSize, ipo.OpenDate, ipo.CloseDate, ipo.ResultDate, ipo.Registrar, ipo.StockID,
+		ipo.IssueSize, ipo.OpenDate, ipo.CloseDate, ipo.ResultDate, ipo.Registrar, ipo.RegistrarID, ipo.StockID,
 		ipo.FormURL, ipo.FormFields, ipo.FormHeaders, ipo.ParserConfig, ipo.Status, ipo.CreatedBy,
 		ipo.Strengths, ipo.Risks, ipo.Financials, ipo.Categories, ipo.FAQs, ipo.RichData, ipo.GrowwDetails,
 	).Scan(&ipo.ID)
@@ -1049,7 +1019,7 @@ func (s *IPOService) UpsertIPO(ctx context.Context, item models.IPO) error {
 			open_date, close_date, listing_date, result_date,
 			listing_gain, min_qty, min_amount,
 			logo_url, about, strengths, risks,
-			status, registrar, stock_id, form_url, form_fields, parser_config,
+			status, registrar, registrar_id, stock_id, form_url, form_fields, parser_config,
 			financials, categories, faqs, rich_data, groww_details
 		) VALUES (
 			$1, $2, $3, $4, 
@@ -1057,8 +1027,8 @@ func (s *IPOService) UpsertIPO(ctx context.Context, item models.IPO) error {
 			$9, $10, $11, $12,
 			$13, $14, $15,
 			$16, $17, $18, $19,
-			$20, $21, $22, '', '{}', '{}',
-			$23, $24, $25, $26, $27
+			$20, $21, $22, $23, '', '{}', '{}',
+			$24, $25, $26, $27, $28
 		)
 		ON CONFLICT (stock_id) DO UPDATE SET
 			name = EXCLUDED.name,
@@ -1087,6 +1057,7 @@ func (s *IPOService) UpsertIPO(ctx context.Context, item models.IPO) error {
 			groww_details = EXCLUDED.groww_details,
 			status = EXCLUDED.status,
 			registrar = EXCLUDED.registrar,
+			registrar_id = EXCLUDED.registrar_id,
 			updated_at = CURRENT_TIMESTAMP;
 	`
 
@@ -1130,7 +1101,7 @@ func (s *IPOService) UpsertIPO(ctx context.Context, item models.IPO) error {
 		item.OpenDate, item.CloseDate, item.ListingDate, item.ResultDate,
 		item.ListingGain, item.MinQty, item.MinAmount,
 		item.LogoURL, item.About, item.Strengths, item.Risks,
-		status, registrar, item.StockID,
+		status, registrar, item.RegistrarID, item.StockID,
 		item.Financials, item.Categories, item.FAQs, item.RichData, item.GrowwDetails,
 	)
 
@@ -1217,7 +1188,7 @@ func (s *IPOService) GetActiveIPOsWithGMPPaginated(ctx context.Context, statusFi
 	query := fmt.Sprintf(`
 		SELECT
 			i.id, i.name, i.company_code, i.description, i.price_band_low, i.price_band_high,
-			i.issue_size, i.open_date, i.close_date, i.result_date, i.registrar, i.stock_id,
+		i.issue_size, i.open_date, i.close_date, i.result_date, i.registrar, i.registrar_id, i.stock_id,
 			i.form_url, i.form_fields, i.form_headers, i.parser_config, i.status, i.subscription_status,
 			i.symbol, i.slug, i.listing_date, i.listing_gain, i.min_qty, i.min_amount,
 			i.logo_url, i.about, i.strengths, i.risks, i.created_at, i.updated_at, i.created_by,
@@ -1263,56 +1234,12 @@ func (s *IPOService) GetActiveIPOsWithGMPPaginated(ctx context.Context, statusFi
 
 	ipos := make([]models.IPOWithGMP, 0, limit)
 	for rows.Next() {
-		var ipo models.IPOWithGMP
-		var formFields, formHeaders, parserConfig, strengths, risks, financials, categories, faqs, richData, growwDetails []byte
-		var extractionMetadataBytes sql.NullString
-
-		err := rows.Scan(
-			&ipo.ID, &ipo.Name, &ipo.CompanyCode, &ipo.Description, &ipo.PriceBandLow, &ipo.PriceBandHigh,
-			&ipo.IssueSize, &ipo.OpenDate, &ipo.CloseDate, &ipo.ResultDate, &ipo.Registrar, &ipo.StockID,
-			&ipo.FormURL, &formFields, &formHeaders, &parserConfig, &ipo.Status, &ipo.SubscriptionStatus,
-			&ipo.Symbol, &ipo.Slug, &ipo.ListingDate, &ipo.ListingGain, &ipo.MinQty, &ipo.MinAmount,
-			&ipo.LogoURL, &ipo.About, &strengths, &risks, &ipo.CreatedAt, &ipo.UpdatedAt, &ipo.CreatedBy,
-			&financials, &categories, &faqs, &richData, &growwDetails,
-			&ipo.GMPValue, &ipo.GainPercent, &ipo.EstimatedListing, &ipo.GMPLastUpdated,
-			&ipo.GMPStockID, &ipo.GMPSubscriptionStatus, &ipo.GMPListingGain, &ipo.GMPIPOStatus,
-			&ipo.GMPDataSource, &extractionMetadataBytes,
-		)
+		ipo, err := s.scanIPOWithGMPRow(rows)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan IPO with GMP row: %w", err)
+			return nil, err
 		}
 
-		// Convert byte arrays to json.RawMessage
-		ipo.FormFields = json.RawMessage(formFields)
-		ipo.FormHeaders = json.RawMessage(formHeaders)
-		ipo.ParserConfig = json.RawMessage(parserConfig)
-		ipo.Strengths = json.RawMessage(strengths)
-		ipo.Risks = json.RawMessage(risks)
-		ipo.Financials = json.RawMessage(financials)
-		ipo.Categories = json.RawMessage(categories)
-		ipo.FAQs = json.RawMessage(faqs)
-		ipo.RichData = json.RawMessage(richData)
-		ipo.GrowwDetails = json.RawMessage(growwDetails)
-
-		// Parse extraction metadata JSON if present
-		if extractionMetadataBytes.Valid && extractionMetadataBytes.String != "" {
-			var metadata models.ExtractionMetadata
-			if err := json.Unmarshal([]byte(extractionMetadataBytes.String), &metadata); err == nil {
-				ipo.GMPExtractionMetadata = &metadata
-			}
-		}
-
-		// Recalculate status based on current time
-		s.recalculateStatusWithGMP(&ipo)
-
-		if ipo.LogoURL != nil {
-			logoURL := s.UtilityService.NormalizeChittorgarhLogoURL(*ipo.LogoURL)
-			if logoURL != "" {
-				ipo.LogoURL = &logoURL
-			}
-		}
-
-		ipos = append(ipos, ipo)
+		ipos = append(ipos, *ipo)
 	}
 
 	if err = rows.Err(); err != nil {
@@ -1358,46 +1285,14 @@ func (s *IPOService) GetActiveIPOsWithGMPPaginatedWithCount(ctx context.Context,
 	return ipos, total, nil
 }
 
-// GetIPOByIDWithGMP returns a single IPO with GMP data joined by company_code
-func (s *IPOService) GetIPOByIDWithGMP(ctx context.Context, id string) (*models.IPOWithGMP, error) {
-	query := `
-		SELECT 
-			i.id, i.name, i.company_code, i.description, i.price_band_low, i.price_band_high,
-			i.issue_size, i.open_date, i.close_date, i.result_date, i.registrar, i.stock_id,
-			i.form_url, i.form_fields, i.form_headers, i.parser_config, i.status, i.subscription_status,
-			i.symbol, i.slug, i.listing_date, i.listing_gain, i.min_qty, i.min_amount,
-			i.logo_url, i.about, i.strengths, i.risks, i.created_at, i.updated_at, i.created_by,
-			i.financials, i.categories, i.faqs, i.rich_data, i.groww_details,
-			g.gmp_value, g.gain_percent, g.estimated_listing, g.last_updated,
-			g.stock_id, g.subscription_status, g.listing_gain, g.ipo_status, 
-			g.data_source, g.extraction_metadata
-		FROM ipo_list i
-		LEFT JOIN ipo_gmp g ON (
-			g.ipo_id = i.id
-			OR (g.ipo_id IS NULL AND i.stock_id IS NOT NULL AND g.stock_id IS NOT NULL AND i.stock_id = g.stock_id)
-			OR (g.ipo_id IS NULL AND i.company_code = g.company_code)
-		)
-		WHERE i.id = $1
-		ORDER BY 
-			-- Prioritize stock_id matches
-			CASE 
-				WHEN g.ipo_id = i.id THEN 1
-				WHEN i.stock_id IS NOT NULL AND g.stock_id IS NOT NULL AND i.stock_id = g.stock_id THEN 2
-				WHEN i.company_code = g.company_code THEN 3
-				ELSE 4
-			END,
-			g.last_updated DESC
-		LIMIT 1
-	`
-
-	row := s.DB.QueryRowContext(ctx, query, id)
+func (s *IPOService) scanIPOWithGMPRow(row interface{ Scan(dest ...interface{}) error }) (*models.IPOWithGMP, error) {
 	var ipo models.IPOWithGMP
 	var formFields, formHeaders, parserConfig, strengths, risks, financials, categories, faqs, richData, growwDetails []byte
 	var extractionMetadataBytes sql.NullString
 
 	err := row.Scan(
 		&ipo.ID, &ipo.Name, &ipo.CompanyCode, &ipo.Description, &ipo.PriceBandLow, &ipo.PriceBandHigh,
-		&ipo.IssueSize, &ipo.OpenDate, &ipo.CloseDate, &ipo.ResultDate, &ipo.Registrar, &ipo.StockID,
+		&ipo.IssueSize, &ipo.OpenDate, &ipo.CloseDate, &ipo.ResultDate, &ipo.Registrar, &ipo.RegistrarID, &ipo.StockID,
 		&ipo.FormURL, &formFields, &formHeaders, &parserConfig, &ipo.Status, &ipo.SubscriptionStatus,
 		&ipo.Symbol, &ipo.Slug, &ipo.ListingDate, &ipo.ListingGain, &ipo.MinQty, &ipo.MinAmount,
 		&ipo.LogoURL, &ipo.About, &strengths, &risks, &ipo.CreatedAt, &ipo.UpdatedAt, &ipo.CreatedBy,
@@ -1410,7 +1305,7 @@ func (s *IPOService) GetIPOByIDWithGMP(ctx context.Context, id string) (*models.
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to scan IPO with GMP: %w", err)
+		return nil, fmt.Errorf("failed to scan IPO with GMP row: %w", err)
 	}
 
 	// Convert byte arrays to json.RawMessage
@@ -1446,6 +1341,41 @@ func (s *IPOService) GetIPOByIDWithGMP(ctx context.Context, id string) (*models.
 	return &ipo, nil
 }
 
+// GetIPOByIDWithGMP returns a single IPO with GMP data joined by company_code
+func (s *IPOService) GetIPOByIDWithGMP(ctx context.Context, id string) (*models.IPOWithGMP, error) {
+	query := `
+		SELECT 
+			i.id, i.name, i.company_code, i.description, i.price_band_low, i.price_band_high,
+		i.issue_size, i.open_date, i.close_date, i.result_date, i.registrar, i.registrar_id, i.stock_id,
+			i.form_url, i.form_fields, i.form_headers, i.parser_config, i.status, i.subscription_status,
+			i.symbol, i.slug, i.listing_date, i.listing_gain, i.min_qty, i.min_amount,
+			i.logo_url, i.about, i.strengths, i.risks, i.created_at, i.updated_at, i.created_by,
+			i.financials, i.categories, i.faqs, i.rich_data, i.groww_details,
+			g.gmp_value, g.gain_percent, g.estimated_listing, g.last_updated,
+			g.stock_id, g.subscription_status, g.listing_gain, g.ipo_status, 
+			g.data_source, g.extraction_metadata
+		FROM ipo_list i
+		LEFT JOIN ipo_gmp g ON (
+			g.ipo_id = i.id
+			OR (g.ipo_id IS NULL AND i.stock_id IS NOT NULL AND g.stock_id IS NOT NULL AND i.stock_id = g.stock_id)
+			OR (g.ipo_id IS NULL AND i.company_code = g.company_code)
+		)
+		WHERE i.id = $1
+		ORDER BY 
+			-- Prioritize stock_id matches
+			CASE 
+				WHEN g.ipo_id = i.id THEN 1
+				WHEN i.stock_id IS NOT NULL AND g.stock_id IS NOT NULL AND i.stock_id = g.stock_id THEN 2
+				WHEN i.company_code = g.company_code THEN 3
+				ELSE 4
+			END,
+			g.last_updated DESC
+		LIMIT 1
+	`
+
+	row := s.DB.QueryRowContext(ctx, query, id)
+	return s.scanIPOWithGMPRow(row)
+}
 // GetServiceMetrics returns the current service metrics
 func (s *IPOService) GetServiceMetrics() *shared.ServiceMetrics {
 	return s.serviceMetrics

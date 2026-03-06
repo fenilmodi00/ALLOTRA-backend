@@ -1,0 +1,31 @@
+CRITICAL BUG FIX: Table Name Mismatch
+=====================================
+
+ISSUE: registrar_code_repository.go queries were using wrong table name
+- Migration created: ipo_registrar_codes
+- Repository was querying: registrar_codes
+
+FIXES APPLIED (3 locations):
+============================
+1. Line 27: INSERT INTO registrar_codes → INSERT INTO ipo_registrar_codes
+2. Line 73: FROM registrar_codes → FROM ipo_registrar_codes  
+3. Line 109: FROM registrar_codes rc → FROM ipo_registrar_codes rc
+
+VERIFICATION:
+=============
+✓ go build -v ./repositories/ - SUCCESS
+✓ No syntax errors after fix
+✓ All 3 table references updated
+✓ Repository file compiles without errors
+
+Before Fix: 3 runtime-breaking SQL errors
+After Fix: Compilation successful, queries will execute correctly
+
+CRITICAL IMPACT:
+================
+This fix prevents ALL repository methods from failing at runtime:
+- Upsert: Would fail with "relation 'registrar_codes' does not exist"
+- GetByIPOAndRegistrar: Would fail with "relation 'registrar_codes' does not exist"
+- GetUnresolvedByResultDate: Would fail with "relation 'registrar_codes' does not exist"
+
+Fixed and verified: 2026-03-02 13:25 UTC

@@ -1,0 +1,1038 @@
+time="2026-03-02T19:01:00+05:30" level=info msg="Connected to database" conn_max_idle_time=5m0s conn_max_lifetime=5m0s max_idle_conns=5 max_open_conns=25
+2026/03/02 19:01:00 goose: no migrations to run. current version: 11
+time="2026-03-02T19:01:00+05:30" level=warning msg="REDIS_URL not configured, using in-memory cache only"
+time="2026-03-02T19:01:00+05:30" level=info msg="Database connection pool configured" conn_max_idle_time=5m0s conn_max_lifetime=5m0s max_idle_conns=5 max_open_conns=25
+time="2026-03-02T19:01:00+05:30" level=info msg="Simplified IPO backend services initialized:"
+time="2026-03-02T19:01:00+05:30" level=info msg="  - Simplified IPO scraper (rate limit: 1s, timeout: 30s)"
+time="2026-03-02T19:01:00+05:30" level=info msg="  - Allotment checker (rate limit: 2s)"
+time="2026-03-02T19:01:00+05:30" level=info msg="  - Unified cache service (TTL: 24h0m0s, max size: 1000)"
+time="2026-03-02T19:01:00+05:30" level=info msg="  - Utility service (text processing and normalization)"
+time="2026-03-02T19:01:00+05:30" level=info msg="  - Simplified IPO service (lifecycle analyzer removed)"
+time="2026-03-02T19:01:00+05:30" level=info msg="  - Redis cache backend configured"
+time="2026-03-02T19:01:00+05:30" level=info msg="Enhanced GMP service initialized with configuration-driven architecture" base_url="https://www.investorgain.com/report/live-ipo-gmp/331/all/" component=EnhancedGMPService db_enabled=true http_timeout=30s rate_limit=1s
+time="2026-03-02T19:01:00+05:30" level=info msg="Database resilience queue worker started"
+time="2026-03-02T19:01:00+05:30" level=info msg="Background jobs configuration" USE_SUPABASE_CRON_raw=false useSupabaseCron=false
+time="2026-03-02T19:01:00+05:30" level=info msg="Server starting on port 8080"
+
+ ΓöîΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÉ 
+ Γöé                  Fiber v2.52.10                   Γöé 
+ Γöé               http://127.0.0.1:8080               Γöé 
+ Γöé       (bound on host 0.0.0.0 and port 8080)       Γöé 
+ Γöé                                                   Γöé 
+ Γöé Handlers ............ 74  Processes ........... 1 Γöé 
+ Γöé Prefork ....... Disabled  PID ............. 25536 Γöé 
+ ΓööΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÿ 
+
+time="2026-03-02T19:01:02+05:30" level=info msg="Cache warmed up successfully"
+time="2026-03-02T19:01:05+05:30" level=info msg="Starting initial GMP history backfill on startup"
+time="2026-03-02T19:01:05+05:30" level=info msg="Processing price history for all active IPOs"
+time="2026-03-02T19:01:05+05:30" level=info msg="Found IPOs to process" ipo_count=0
+time="2026-03-02T19:01:05+05:30" level=info msg="Completed processing all active IPO price history" avg_time_per_ipo=0.00s error_count=0 processing_time=31.4161ms success_count=0 success_rate="0.00%" total_ipos=0 total_records_added=0
+time="2026-03-02T19:01:05+05:30" level=info msg="Initial GMP history backfill completed: 0 processed, 0 success, 0 failed"
+time="2026-03-02T19:08:21+05:30" level=info msg="Manual daily IPO update triggered via admin endpoint"
+time="2026-03-02T19:08:21+05:30" level=info msg="Starting Daily IPO Update Job with Groww primary + Chittorgarh fallback"
+time="2026-03-02T19:08:21+05:30" level=info msg="Discovering all available IPO slugs from Groww..."
+time="2026-03-02T19:08:21+05:30" level=info msg="Discovering IPO slugs from Groww dashboard and tabs" component=GrowwScraperService
+time="2026-03-02T19:08:21+05:30" level=info msg="Groww slug discovery complete" component=GrowwScraperService slugs_found=59
+time="2026-03-02T19:08:21+05:30" level=info msg="Discovered 59 slugs from Groww (cache built for entity resolution)"
+time="2026-03-02T19:08:21+05:30" level=info msg="Fetching IPO list from Chittorgarh scraping service..."
+time="2026-03-02T19:08:21+05:30" level=info msg="Fetched 26 IPOs from Chittorgarh for processing"
+time="2026-03-02T19:08:21+05:30" level=info msg="Processing IPO 1/26: Rajputana Stainless IPO" ipo_index=1 ipo_name="Rajputana Stainless IPO" slug=rajputana-stainless-ipo total_ipos=26
+time="2026-03-02T19:08:21+05:30" level=warning msg="Function failed, retrying after backoff" attempt=1 component=RetryWithExponentialBackoff delay=900ms error="HTTP 404 from https://groww.in/v1/api/stocks_primary_market_data/v1/ipo/company/rajputana-stainless-ipo?isHniEnabled=true" max_attempts=3
+time="2026-03-02T19:08:22+05:30" level=warning msg="Function failed, retrying after backoff" attempt=1 component=RetryWithExponentialBackoff delay=900ms error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/rajputana-stainless-ipo" max_attempts=3
+time="2026-03-02T19:08:22+05:30" level=warning msg="Function failed, retrying after backoff" attempt=2 component=RetryWithExponentialBackoff delay=1.8s error="HTTP 404 from https://groww.in/v1/api/stocks_primary_market_data/v1/ipo/company/rajputana-stainless-ipo?isHniEnabled=true" max_attempts=3
+time="2026-03-02T19:08:22+05:30" level=warning msg="Function failed, retrying after backoff" attempt=2 component=RetryWithExponentialBackoff delay=1.8s error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/rajputana-stainless-ipo" max_attempts=3
+time="2026-03-02T19:08:24+05:30" level=error msg="Function failed after all retry attempts" component=RetryWithExponentialBackoff final_error="HTTP 404 from https://groww.in/v1/api/stocks_primary_market_data/v1/ipo/company/rajputana-stainless-ipo?isHniEnabled=true" max_attempts=3
+time="2026-03-02T19:08:24+05:30" level=warning msg="Circuit breaker recorded failure" circuit_breaker=groww-scraper failure_count=1 max_failures=5 state=CLOSED
+time="2026-03-02T19:08:24+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(rajputana-stainless-ipo): failed after 3 attempts: HTTP 404 from https://groww.in/v1/api/stocks_primary_market_data/v1/ipo/company/rajputana-stainless-ipo?isHniEnabled=true" slug=rajputana-stainless-ipo
+time="2026-03-02T19:08:24+05:30" level=error msg="Function failed after all retry attempts" component=RetryWithExponentialBackoff final_error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/rajputana-stainless-ipo" max_attempts=3
+time="2026-03-02T19:08:24+05:30" level=warning msg="Circuit breaker recorded failure" circuit_breaker=groww-scraper failure_count=2 max_failures=5 state=CLOSED
+time="2026-03-02T19:08:24+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(rajputana-stainless-ipo): failed after 3 attempts: HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/rajputana-stainless-ipo" slug=rajputana-stainless-ipo
+time="2026-03-02T19:08:24+05:30" level=warning msg="Groww failed or 404ed, falling back to Chittorgarh" chitt_slug=rajputana-stainless-ipo error="FetchIPODetails(rajputana-stainless-ipo): failed after 3 attempts: HTTP 404 from https://groww.in/v1/api/stocks_primary_market_data/v1/ipo/company/rajputana-stainless-ipo?isHniEnabled=true" slug=rajputana-stainless-ipo
+time="2026-03-02T19:08:24+05:30" level=info msg="Starting detailed IPO information scraping" component=ChittorgarhIPOScrapingService ipo_id=2067 ipo_title="Rajputana Stainless IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:08:25+05:30" level=info msg="Successfully extracted and cleaned description" component=HTMLDataExtractor final_text_length=1004 final_text_preview="The company offers a range of stainless steel products, including billets, forging ingots, rolled bl..." method=ExtractCompanyDescription
+time="2026-03-02T19:08:25+05:30" level=info msg="Successfully extracted description from HTML fallback" company_name="Rajputana Stainless Ltd." component=ChittorgarhIPOScrapingService ipo_id=2067 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=1004 text_preview="The company offers a range of stainless steel products, including billets, forging ingots, rolled bl..."
+time="2026-03-02T19:08:25+05:30" level=warning msg="No content found with any selector" component=HTMLDataExtractor field_type=about selectors_tried=59
+time="2026-03-02T19:08:25+05:30" level=warning msg="No about content found with any selector" component=HTMLDataExtractor method=ExtractCompanyAbout
+time="2026-03-02T19:08:25+05:30" level=warning msg="No about found in JSON or HTML" company_name="Rajputana Stainless Ltd." component=ChittorgarhIPOScrapingService ipo_id=2067 method=convertChittorgarhDataToIPOWithLogging
+time="2026-03-02T19:08:25+05:30" level=info msg="Successfully extracted IPO data from JSON" component=ChittorgarhIPOScrapingService ipo_id=2067 ipo_title="Rajputana Stainless IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:08:25+05:30" level=info msg="Completed detailed IPO information scraping" company_code=RSL component=ChittorgarhIPOScrapingService has_about=false has_description=true ipo_id=2067 ipo_name="Rajputana Stainless Ltd." ipo_title="Rajputana Stainless IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:08:25+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:08:25.1995537 +0530 IST m=+444.942721201" entity_id=2067 entity_type=IPO meta_company_code=RSL meta_company_name="Rajputana Stainless Ltd." meta_status=UPCOMING operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:08:25+05:30" level=info msg="IPO upserted successfully" company_code=RSL ipo_name="Rajputana Stainless Ltd." stock_id=2067
+time="2026-03-02T19:08:27+05:30" level=info msg="Processing IPO 2/26: SEDEMAC Mechatronics IPO" ipo_index=2 ipo_name="SEDEMAC Mechatronics IPO" slug=sedemac-mechatronics-ipo total_ipos=26
+time="2026-03-02T19:08:27+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=sedemac-mechatronics-ipo groww_slug=sedemac-mechatronics-ipo
+time="2026-03-02T19:08:27+05:30" level=info msg="Scraped rich data from Groww successfully (matched via Entity Resolution)" chitt_slug=sedemac-mechatronics-ipo slug=sedemac-mechatronics-ipo
+time="2026-03-02T19:08:27+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:08:27.3265349 +0530 IST m=+447.069702401" entity_id=2794 entity_type=IPO meta_company_code=sedemac-mechatronics meta_company_name="Sedemac Mechatronics Ltd" meta_status=UPCOMING operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:08:27+05:30" level=info msg="IPO upserted successfully" company_code=sedemac-mechatronics ipo_name="Sedemac Mechatronics Ltd" stock_id=2794
+time="2026-03-02T19:08:29+05:30" level=info msg="Processing IPO 3/26: Omnitech Engineering IPO" ipo_index=3 ipo_name="Omnitech Engineering IPO" slug=omnitech-engineering-ipo total_ipos=26
+time="2026-03-02T19:08:29+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=omnitech-engineering-ipo groww_slug=omnitech-engineering-ipo
+time="2026-03-02T19:08:29+05:30" level=warning msg="Function failed, retrying after backoff" attempt=1 component=RetryWithExponentialBackoff delay=900ms error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/omnitech-engineering-ipo" max_attempts=3
+time="2026-03-02T19:08:30+05:30" level=warning msg="Function failed, retrying after backoff" attempt=2 component=RetryWithExponentialBackoff delay=1.8s error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/omnitech-engineering-ipo" max_attempts=3
+time="2026-03-02T19:08:32+05:30" level=error msg="Function failed after all retry attempts" component=RetryWithExponentialBackoff final_error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/omnitech-engineering-ipo" max_attempts=3
+time="2026-03-02T19:08:32+05:30" level=warning msg="Circuit breaker recorded failure" circuit_breaker=groww-scraper failure_count=1 max_failures=5 state=CLOSED
+time="2026-03-02T19:08:32+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(omnitech-engineering-ipo): failed after 3 attempts: HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/omnitech-engineering-ipo" slug=omnitech-engineering-ipo
+time="2026-03-02T19:08:32+05:30" level=info msg="Groww details fetched; CMS missing (non-fatal)" chitt_slug=omnitech-engineering-ipo cms_error="FetchCMSContent(omnitech-engineering-ipo): failed after 3 attempts: HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/omnitech-engineering-ipo" slug=omnitech-engineering-ipo
+time="2026-03-02T19:08:32+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:08:32.2537997 +0530 IST m=+451.996967201" entity_id=2479 entity_type=IPO meta_company_code=omnitech-engineering meta_company_name="Omnitech Engineering Ltd" meta_status=CLOSED operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:08:32+05:30" level=info msg="IPO upserted successfully" company_code=omnitech-engineering ipo_name="Omnitech Engineering Ltd" stock_id=2479
+time="2026-03-02T19:08:34+05:30" level=info msg="Processing IPO 4/26: PNGS Reva Diamond Jewellery IPO" ipo_index=4 ipo_name="PNGS Reva Diamond Jewellery IPO" slug=pngs-reva-ipo total_ipos=26
+time="2026-03-02T19:08:34+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=pngs-reva-ipo groww_slug=pngs-reva-ipo
+time="2026-03-02T19:08:34+05:30" level=warning msg="Function failed, retrying after backoff" attempt=1 component=RetryWithExponentialBackoff delay=900ms error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/pngs-reva-ipo" max_attempts=3
+time="2026-03-02T19:08:35+05:30" level=warning msg="Function failed, retrying after backoff" attempt=2 component=RetryWithExponentialBackoff delay=1.8s error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/pngs-reva-ipo" max_attempts=3
+time="2026-03-02T19:08:37+05:30" level=error msg="Function failed after all retry attempts" component=RetryWithExponentialBackoff final_error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/pngs-reva-ipo" max_attempts=3
+time="2026-03-02T19:08:37+05:30" level=warning msg="Circuit breaker recorded failure" circuit_breaker=groww-scraper failure_count=1 max_failures=5 state=CLOSED
+time="2026-03-02T19:08:37+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(pngs-reva-ipo): failed after 3 attempts: HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/pngs-reva-ipo" slug=pngs-reva-ipo
+time="2026-03-02T19:08:37+05:30" level=info msg="Groww details fetched; CMS missing (non-fatal)" chitt_slug=pngs-reva-ipo cms_error="FetchCMSContent(pngs-reva-ipo): failed after 3 attempts: HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/pngs-reva-ipo" slug=pngs-reva-ipo
+time="2026-03-02T19:08:37+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:08:37.1955931 +0530 IST m=+456.938760601" entity_id=2475 entity_type=IPO meta_company_code=pngs-reva-diamond-jewellery meta_company_name="PNGS Reva Diamond Jewellery Limited" meta_status=CLOSED operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:08:37+05:30" level=info msg="IPO upserted successfully" company_code=pngs-reva-diamond-jewellery ipo_name="PNGS Reva Diamond Jewellery Limited" stock_id=2475
+time="2026-03-02T19:08:39+05:30" level=info msg="Processing IPO 5/26: Clean Max Enviro Energy Solutions IPO" ipo_index=5 ipo_name="Clean Max Enviro Energy Solutions IPO" slug=clean-max-enviro-energy-solutions-ipo total_ipos=26
+time="2026-03-02T19:08:39+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=clean-max-enviro-energy-solutions-ipo groww_slug=clean-max-enviro-energy-solutions-ipo
+time="2026-03-02T19:08:39+05:30" level=info msg="Scraped rich data from Groww successfully (matched via Entity Resolution)" chitt_slug=clean-max-enviro-energy-solutions-ipo slug=clean-max-enviro-energy-solutions-ipo
+time="2026-03-02T19:08:39+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:08:39.3757346 +0530 IST m=+459.118902101" entity_id=2573 entity_type=IPO meta_company_code=clean-max-enviro-energy-solutions meta_company_name="Clean Max Enviro Energy Solutions Ltd" meta_status=LISTED operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:08:39+05:30" level=info msg="IPO upserted successfully" company_code=clean-max-enviro-energy-solutions ipo_name="Clean Max Enviro Energy Solutions Ltd" stock_id=2573
+time="2026-03-02T19:08:41+05:30" level=info msg="Processing IPO 6/26: Shree Ram Twistex IPO" ipo_index=6 ipo_name="Shree Ram Twistex IPO" slug=shree-ram-twistex-ipo total_ipos=26
+time="2026-03-02T19:08:41+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=shree-ram-twistex-ipo groww_slug=shree-ram-twistex-ipo
+time="2026-03-02T19:08:41+05:30" level=info msg="Scraped rich data from Groww successfully (matched via Entity Resolution)" chitt_slug=shree-ram-twistex-ipo slug=shree-ram-twistex-ipo
+time="2026-03-02T19:08:41+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:08:41.5254476 +0530 IST m=+461.268615101" entity_id=2502 entity_type=IPO meta_company_code=shree-ram-twistex meta_company_name="Shree Ram Twistex Ltd" meta_status=LISTED operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:08:41+05:30" level=info msg="IPO upserted successfully" company_code=shree-ram-twistex ipo_name="Shree Ram Twistex Ltd" stock_id=2502
+time="2026-03-02T19:08:43+05:30" level=info msg="Processing IPO 7/26: Gaudium IVF IPO" ipo_index=7 ipo_name="Gaudium IVF IPO" slug=gaudium-ivf-ipo total_ipos=26
+time="2026-03-02T19:08:43+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=gaudium-ivf-ipo groww_slug=gaudium-ivf-ipo
+time="2026-03-02T19:08:43+05:30" level=info msg="Scraped rich data from Groww successfully (matched via Entity Resolution)" chitt_slug=gaudium-ivf-ipo slug=gaudium-ivf-ipo
+time="2026-03-02T19:08:43+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:08:43.6689363 +0530 IST m=+463.412103801" entity_id=2019 entity_type=IPO meta_company_code=gaudium-ivf-and-women-health meta_company_name="Gaudium IVF and Women Health Ltd" meta_status=LISTED operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:08:43+05:30" level=info msg="IPO upserted successfully" company_code=gaudium-ivf-and-women-health ipo_name="Gaudium IVF and Women Health Ltd" stock_id=2019
+time="2026-03-02T19:08:45+05:30" level=info msg="Processing IPO 8/26: Fractal Analytics IPO" ipo_index=8 ipo_name="Fractal Analytics IPO" slug=fractal-analytics-ipo total_ipos=26
+time="2026-03-02T19:08:45+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=fractal-analytics-ipo groww_slug=fractal-analytics-ipo
+time="2026-03-02T19:08:45+05:30" level=info msg="Scraped rich data from Groww successfully (matched via Entity Resolution)" chitt_slug=fractal-analytics-ipo slug=fractal-analytics-ipo
+time="2026-03-02T19:08:45+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:08:45.8307029 +0530 IST m=+465.573870401" entity_id=2569 entity_type=IPO meta_company_code=fractal-analytics meta_company_name="Fractal Analytics Ltd" meta_status=LISTED operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:08:45+05:30" level=info msg="IPO upserted successfully" company_code=fractal-analytics ipo_name="Fractal Analytics Ltd" stock_id=2569
+time="2026-03-02T19:08:47+05:30" level=info msg="Processing IPO 9/26: Aye Finance IPO" ipo_index=9 ipo_name="Aye Finance IPO" slug=aye-finance-ipo total_ipos=26
+time="2026-03-02T19:08:47+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=aye-finance-ipo groww_slug=aye-finance-ipo
+time="2026-03-02T19:08:47+05:30" level=warning msg="Function failed, retrying after backoff" attempt=1 component=RetryWithExponentialBackoff delay=900ms error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/aye-finance-ipo" max_attempts=3
+time="2026-03-02T19:08:48+05:30" level=warning msg="Function failed, retrying after backoff" attempt=2 component=RetryWithExponentialBackoff delay=1.8s error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/aye-finance-ipo" max_attempts=3
+time="2026-03-02T19:08:50+05:30" level=error msg="Function failed after all retry attempts" component=RetryWithExponentialBackoff final_error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/aye-finance-ipo" max_attempts=3
+time="2026-03-02T19:08:50+05:30" level=warning msg="Circuit breaker recorded failure" circuit_breaker=groww-scraper failure_count=1 max_failures=5 state=CLOSED
+time="2026-03-02T19:08:50+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(aye-finance-ipo): failed after 3 attempts: HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/aye-finance-ipo" slug=aye-finance-ipo
+time="2026-03-02T19:08:50+05:30" level=info msg="Groww details fetched; CMS missing (non-fatal)" chitt_slug=aye-finance-ipo cms_error="FetchCMSContent(aye-finance-ipo): failed after 3 attempts: HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/aye-finance-ipo" slug=aye-finance-ipo
+time="2026-03-02T19:08:50+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:08:50.7454275 +0530 IST m=+470.488595001" entity_id=2026 entity_type=IPO meta_company_code=aye-finance meta_company_name="Aye Finance Ltd" meta_status=LISTED operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:08:50+05:30" level=info msg="IPO upserted successfully" company_code=aye-finance ipo_name="Aye Finance Ltd" stock_id=2026
+time="2026-03-02T19:08:52+05:30" level=info msg="Processing IPO 10/26: Srinibas Pradhan Constructions IPO" ipo_index=10 ipo_name="Srinibas Pradhan Constructions IPO" slug=srinibas-pradhan-ipo total_ipos=26
+time="2026-03-02T19:08:52+05:30" level=warning msg="Function failed, retrying after backoff" attempt=1 component=RetryWithExponentialBackoff delay=900ms error="HTTP 404 from https://groww.in/v1/api/stocks_primary_market_data/v1/ipo/company/srinibas-pradhan-ipo?isHniEnabled=true" max_attempts=3
+time="2026-03-02T19:08:52+05:30" level=warning msg="Function failed, retrying after backoff" attempt=1 component=RetryWithExponentialBackoff delay=900ms error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/srinibas-pradhan-ipo" max_attempts=3
+time="2026-03-02T19:08:53+05:30" level=warning msg="Function failed, retrying after backoff" attempt=2 component=RetryWithExponentialBackoff delay=1.8s error="HTTP 404 from https://groww.in/v1/api/stocks_primary_market_data/v1/ipo/company/srinibas-pradhan-ipo?isHniEnabled=true" max_attempts=3
+time="2026-03-02T19:08:53+05:30" level=warning msg="Function failed, retrying after backoff" attempt=2 component=RetryWithExponentialBackoff delay=1.8s error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/srinibas-pradhan-ipo" max_attempts=3
+time="2026-03-02T19:08:55+05:30" level=error msg="Function failed after all retry attempts" component=RetryWithExponentialBackoff final_error="HTTP 404 from https://groww.in/v1/api/stocks_primary_market_data/v1/ipo/company/srinibas-pradhan-ipo?isHniEnabled=true" max_attempts=3
+time="2026-03-02T19:08:55+05:30" level=warning msg="Circuit breaker recorded failure" circuit_breaker=groww-scraper failure_count=2 max_failures=5 state=CLOSED
+time="2026-03-02T19:08:55+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(srinibas-pradhan-ipo): failed after 3 attempts: HTTP 404 from https://groww.in/v1/api/stocks_primary_market_data/v1/ipo/company/srinibas-pradhan-ipo?isHniEnabled=true" slug=srinibas-pradhan-ipo
+time="2026-03-02T19:08:55+05:30" level=error msg="Function failed after all retry attempts" component=RetryWithExponentialBackoff final_error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/srinibas-pradhan-ipo" max_attempts=3
+time="2026-03-02T19:08:55+05:30" level=warning msg="Circuit breaker recorded failure" circuit_breaker=groww-scraper failure_count=3 max_failures=5 state=CLOSED
+time="2026-03-02T19:08:55+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(srinibas-pradhan-ipo): failed after 3 attempts: HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/srinibas-pradhan-ipo" slug=srinibas-pradhan-ipo
+time="2026-03-02T19:08:55+05:30" level=warning msg="Groww failed or 404ed, falling back to Chittorgarh" chitt_slug=srinibas-pradhan-ipo error="FetchIPODetails(srinibas-pradhan-ipo): failed after 3 attempts: HTTP 404 from https://groww.in/v1/api/stocks_primary_market_data/v1/ipo/company/srinibas-pradhan-ipo?isHniEnabled=true" slug=srinibas-pradhan-ipo
+time="2026-03-02T19:08:55+05:30" level=info msg="Starting detailed IPO information scraping" component=ChittorgarhIPOScrapingService ipo_id=2402 ipo_title="Srinibas Pradhan Constructions IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:08:55+05:30" level=info msg="Successfully extracted and cleaned description" component=HTMLDataExtractor final_text_length=25 final_text_preview="Core Business Activities." method=ExtractCompanyDescription
+time="2026-03-02T19:08:55+05:30" level=info msg="Successfully extracted description from HTML fallback" company_name="Srinibas Pradhan Constructions Ltd." component=ChittorgarhIPOScrapingService ipo_id=2402 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=25 text_preview="Core Business Activities."
+time="2026-03-02T19:08:55+05:30" level=info msg="Successfully extracted and cleaned about" component=HTMLDataExtractor final_text_length=4996 final_text_preview="DashboardSME IPO ListSrinibas Pradhan Constructions IPO DetailsBookbuilding IPO SMEIPO DetailsMessag..." method=ExtractCompanyAbout
+time="2026-03-02T19:08:55+05:30" level=info msg="Successfully extracted about from HTML fallback" company_name="Srinibas Pradhan Constructions Ltd." component=ChittorgarhIPOScrapingService ipo_id=2402 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=4996 text_preview="DashboardSME IPO ListSrinibas Pradhan Constructions IPO DetailsBookbuilding IPO SMEIPO DetailsMessag..."
+time="2026-03-02T19:08:55+05:30" level=info msg="Successfully extracted IPO data from JSON" component=ChittorgarhIPOScrapingService ipo_id=2402 ipo_title="Srinibas Pradhan Constructions IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:08:55+05:30" level=info msg="Completed detailed IPO information scraping" company_code=SPCL component=ChittorgarhIPOScrapingService has_about=true has_description=true ipo_id=2402 ipo_name="Srinibas Pradhan Constructions Ltd." ipo_title="Srinibas Pradhan Constructions IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:08:55+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:08:55.8728741 +0530 IST m=+475.616041601" entity_id=2402 entity_type=IPO meta_company_code=SPCL meta_company_name="Srinibas Pradhan Constructions Ltd." meta_status=UPCOMING operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:08:55+05:30" level=info msg="IPO upserted successfully" company_code=SPCL ipo_name="Srinibas Pradhan Constructions Ltd." stock_id=2402
+time="2026-03-02T19:08:57+05:30" level=info msg="Processing IPO 11/26: Elfin Agro India IPO" ipo_index=11 ipo_name="Elfin Agro India IPO" slug=elfin-agro-india-ipo total_ipos=26
+time="2026-03-02T19:08:57+05:30" level=warning msg="Function failed, retrying after backoff" attempt=1 component=RetryWithExponentialBackoff delay=900ms error="HTTP 404 from https://groww.in/v1/api/stocks_primary_market_data/v1/ipo/company/elfin-agro-india-ipo?isHniEnabled=true" max_attempts=3
+time="2026-03-02T19:08:57+05:30" level=warning msg="Function failed, retrying after backoff" attempt=1 component=RetryWithExponentialBackoff delay=900ms error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/elfin-agro-india-ipo" max_attempts=3
+time="2026-03-02T19:08:58+05:30" level=warning msg="Function failed, retrying after backoff" attempt=2 component=RetryWithExponentialBackoff delay=1.8s error="HTTP 404 from https://groww.in/v1/api/stocks_primary_market_data/v1/ipo/company/elfin-agro-india-ipo?isHniEnabled=true" max_attempts=3
+time="2026-03-02T19:08:58+05:30" level=warning msg="Function failed, retrying after backoff" attempt=2 component=RetryWithExponentialBackoff delay=1.8s error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/elfin-agro-india-ipo" max_attempts=3
+time="2026-03-02T19:09:00+05:30" level=error msg="Function failed after all retry attempts" component=RetryWithExponentialBackoff final_error="HTTP 404 from https://groww.in/v1/api/stocks_primary_market_data/v1/ipo/company/elfin-agro-india-ipo?isHniEnabled=true" max_attempts=3
+time="2026-03-02T19:09:00+05:30" level=warning msg="Circuit breaker recorded failure" circuit_breaker=groww-scraper failure_count=4 max_failures=5 state=CLOSED
+time="2026-03-02T19:09:00+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(elfin-agro-india-ipo): failed after 3 attempts: HTTP 404 from https://groww.in/v1/api/stocks_primary_market_data/v1/ipo/company/elfin-agro-india-ipo?isHniEnabled=true" slug=elfin-agro-india-ipo
+time="2026-03-02T19:09:00+05:30" level=error msg="Function failed after all retry attempts" component=RetryWithExponentialBackoff final_error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/elfin-agro-india-ipo" max_attempts=3
+time="2026-03-02T19:09:00+05:30" level=error msg="Circuit breaker opened due to failures" circuit_breaker=groww-scraper failure_count=5 state=OPEN timeout=1m0s
+time="2026-03-02T19:09:00+05:30" level=warning msg="Circuit breaker recorded failure" circuit_breaker=groww-scraper failure_count=5 max_failures=5 state=OPEN
+time="2026-03-02T19:09:00+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(elfin-agro-india-ipo): failed after 3 attempts: HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/elfin-agro-india-ipo" slug=elfin-agro-india-ipo
+time="2026-03-02T19:09:00+05:30" level=warning msg="Groww failed or 404ed, falling back to Chittorgarh" chitt_slug=elfin-agro-india-ipo error="FetchIPODetails(elfin-agro-india-ipo): failed after 3 attempts: HTTP 404 from https://groww.in/v1/api/stocks_primary_market_data/v1/ipo/company/elfin-agro-india-ipo?isHniEnabled=true" slug=elfin-agro-india-ipo
+time="2026-03-02T19:09:00+05:30" level=info msg="Starting detailed IPO information scraping" component=ChittorgarhIPOScrapingService ipo_id=2696 ipo_title="Elfin Agro India IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:00+05:30" level=error msg="Failed to parse IPO JSON data" component=ChittorgarhIPOScrapingService error="json: cannot unmarshal string into Go struct field ChittorgarhIPOData.issue_price_lower of type float64" ipo_id=2696 ipo_title="Elfin Agro India IPO" method=extractIPODataFromJSONWithLogging
+time="2026-03-02T19:09:00+05:30" level=warning msg="JSON extraction failed, falling back to HTML parsing" component=ChittorgarhIPOScrapingService error="failed to parse IPO JSON data: json: cannot unmarshal string into Go struct field ChittorgarhIPOData.issue_price_lower of type float64" ipo_id=2696 ipo_title="Elfin Agro India IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:00+05:30" level=info msg="Successfully extracted and cleaned description" component=HTMLDataExtractor final_text_length=266 final_text_preview="Elfin Agro India Limited is primarily engaged in the business of manufacturing of Chakki Atta (High ..." method=ExtractCompanyDescription
+time="2026-03-02T19:09:00+05:30" level=info msg="Successfully extracted description from HTML" component=ChittorgarhIPOScrapingService extraction_type=description ipo_id=2696 ipo_title="Elfin Agro India IPO" method=buildIPOModelFromExtractedDataWithLogging text_length=266 text_preview="Elfin Agro India Limited is primarily engaged in the business of manufacturing of Chakki Atta (High ..."
+time="2026-03-02T19:09:00+05:30" level=warning msg="No content found with any selector" component=HTMLDataExtractor field_type=about selectors_tried=59
+time="2026-03-02T19:09:00+05:30" level=warning msg="No about content found with any selector" component=HTMLDataExtractor method=ExtractCompanyAbout
+time="2026-03-02T19:09:00+05:30" level=warning msg="No about found in HTML" component=ChittorgarhIPOScrapingService extraction_type=about ipo_id=2696 ipo_title="Elfin Agro India IPO" method=buildIPOModelFromExtractedDataWithLogging
+time="2026-03-02T19:09:00+05:30" level=info msg="Completed detailed IPO information scraping" company_code=ELFIN component=ChittorgarhIPOScrapingService has_about=false has_description=true ipo_id=2696 ipo_name="Elfin Agro India IPO Details" ipo_title="Elfin Agro India IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:00+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:09:00.9087592 +0530 IST m=+480.651926701" entity_id=2696 entity_type=IPO meta_company_code=ELFIN meta_company_name="Elfin Agro India IPO Details" meta_status=UNKNOWN operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:09:00+05:30" level=info msg="IPO upserted successfully" company_code=ELFIN ipo_name="Elfin Agro India IPO Details" stock_id=2696
+time="2026-03-02T19:09:02+05:30" level=info msg="Processing IPO 12/26: Acetech E-Commerce IPO" ipo_index=12 ipo_name="Acetech E-Commerce IPO" slug=acetech-e-commerce-ipo total_ipos=26
+time="2026-03-02T19:09:02+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=acetech-e-commerce-ipo groww_slug=acetech-e-commerce-ipo
+time="2026-03-02T19:09:02+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.836324s
+time="2026-03-02T19:09:02+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(acetech-e-commerce-ipo): circuit breaker is open" slug=acetech-e-commerce-ipo
+time="2026-03-02T19:09:02+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.836324s
+time="2026-03-02T19:09:02+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(acetech-e-commerce-ipo): circuit breaker is open" slug=acetech-e-commerce-ipo
+time="2026-03-02T19:09:02+05:30" level=warning msg="Groww failed or 404ed, falling back to Chittorgarh" chitt_slug=acetech-e-commerce-ipo error="FetchIPODetails(acetech-e-commerce-ipo): circuit breaker is open" slug=acetech-e-commerce-ipo
+time="2026-03-02T19:09:02+05:30" level=info msg="Starting detailed IPO information scraping" component=ChittorgarhIPOScrapingService ipo_id=2616 ipo_title="Acetech E-Commerce IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:03+05:30" level=warning msg="Description text too short after cleaning, rejecting" cleaned_text_length=0 component=HTMLDataExtractor method=ExtractCompanyDescription minimum_required=10
+time="2026-03-02T19:09:03+05:30" level=warning msg="No description found in JSON or HTML" company_name="Acetech E-Commerce Ltd." component=ChittorgarhIPOScrapingService ipo_id=2616 method=convertChittorgarhDataToIPOWithLogging
+time="2026-03-02T19:09:03+05:30" level=warning msg="About text too short after cleaning, rejecting" cleaned_text_length=0 component=HTMLDataExtractor method=ExtractCompanyAbout minimum_required=10
+time="2026-03-02T19:09:03+05:30" level=warning msg="No about found in JSON or HTML" company_name="Acetech E-Commerce Ltd." component=ChittorgarhIPOScrapingService ipo_id=2616 method=convertChittorgarhDataToIPOWithLogging
+time="2026-03-02T19:09:03+05:30" level=info msg="Successfully extracted IPO data from JSON" component=ChittorgarhIPOScrapingService ipo_id=2616 ipo_title="Acetech E-Commerce IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:03+05:30" level=info msg="Completed detailed IPO information scraping" company_code=AEL component=ChittorgarhIPOScrapingService has_about=false has_description=false ipo_id=2616 ipo_name="Acetech E-Commerce Ltd." ipo_title="Acetech E-Commerce IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:03+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:09:03.0760991 +0530 IST m=+482.819266601" entity_id=2616 entity_type=IPO meta_company_code=AEL meta_company_name="Acetech E-Commerce Ltd." meta_status=ACTIVE operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:09:03+05:30" level=info msg="IPO upserted successfully" company_code=AEL ipo_name="Acetech E-Commerce Ltd." stock_id=2616
+time="2026-03-02T19:09:05+05:30" level=info msg="Processing IPO 13/26: Striders Impex IPO" ipo_index=13 ipo_name="Striders Impex IPO" slug=striders-impex-ipo total_ipos=26
+time="2026-03-02T19:09:05+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=striders-impex-ipo groww_slug=striders-impex-ipo
+time="2026-03-02T19:09:05+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=55.6691379s
+time="2026-03-02T19:09:05+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(striders-impex-ipo): circuit breaker is open" slug=striders-impex-ipo
+time="2026-03-02T19:09:05+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=55.6691379s
+time="2026-03-02T19:09:05+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(striders-impex-ipo): circuit breaker is open" slug=striders-impex-ipo
+time="2026-03-02T19:09:05+05:30" level=warning msg="Groww failed or 404ed, falling back to Chittorgarh" chitt_slug=striders-impex-ipo error="FetchIPODetails(striders-impex-ipo): circuit breaker is open" slug=striders-impex-ipo
+time="2026-03-02T19:09:05+05:30" level=info msg="Starting detailed IPO information scraping" component=ChittorgarhIPOScrapingService ipo_id=2714 ipo_title="Striders Impex IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:05+05:30" level=info msg="Successfully extracted and cleaned description" component=HTMLDataExtractor final_text_length=175 final_text_preview="Incorporated in 2021, Striders Impex Limited is primarily engaged in the business of licensing, own ..." method=ExtractCompanyDescription
+time="2026-03-02T19:09:05+05:30" level=info msg="Successfully extracted description from HTML fallback" company_name="Striders Impex Ltd." component=ChittorgarhIPOScrapingService ipo_id=2714 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=175 text_preview="Incorporated in 2021, Striders Impex Limited is primarily engaged in the business of licensing, own ..."
+time="2026-03-02T19:09:05+05:30" level=info msg="Successfully extracted and cleaned about" component=HTMLDataExtractor final_text_length=4700 final_text_preview="SME Striders Impex IPO is a book build issue of Γé╣36.29 crores. The issue is a combination of fresh..." method=ExtractCompanyAbout
+time="2026-03-02T19:09:05+05:30" level=info msg="Successfully extracted about from HTML fallback" company_name="Striders Impex Ltd." component=ChittorgarhIPOScrapingService ipo_id=2714 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=4700 text_preview="SME Striders Impex IPO is a book build issue of Γé╣36.29 crores. The issue is a combination of fresh..."
+time="2026-03-02T19:09:05+05:30" level=info msg="Successfully extracted IPO data from JSON" component=ChittorgarhIPOScrapingService ipo_id=2714 ipo_title="Striders Impex IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:05+05:30" level=info msg="Completed detailed IPO information scraping" company_code=SIL component=ChittorgarhIPOScrapingService has_about=true has_description=true ipo_id=2714 ipo_name="Striders Impex Ltd." ipo_title="Striders Impex IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:05+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:09:05.253805 +0530 IST m=+484.996972501" entity_id=2714 entity_type=IPO meta_company_code=SIL meta_company_name="Striders Impex Ltd." meta_status=ACTIVE operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:09:05+05:30" level=info msg="IPO upserted successfully" company_code=SIL ipo_name="Striders Impex Ltd." stock_id=2714
+time="2026-03-02T19:09:07+05:30" level=info msg="Processing IPO 14/26: Yaap Digital IPO" ipo_index=14 ipo_name="Yaap Digital IPO" slug=yaap-digital-ipo total_ipos=26
+time="2026-03-02T19:09:07+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=yaap-digital-ipo groww_slug=yaap-digital-ipo
+time="2026-03-02T19:09:07+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=53.4898368s
+time="2026-03-02T19:09:07+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(yaap-digital-ipo): circuit breaker is open" slug=yaap-digital-ipo
+time="2026-03-02T19:09:07+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=53.4898368s
+time="2026-03-02T19:09:07+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(yaap-digital-ipo): circuit breaker is open" slug=yaap-digital-ipo
+time="2026-03-02T19:09:07+05:30" level=warning msg="Groww failed or 404ed, falling back to Chittorgarh" chitt_slug=yaap-digital-ipo error="FetchIPODetails(yaap-digital-ipo): circuit breaker is open" slug=yaap-digital-ipo
+time="2026-03-02T19:09:07+05:30" level=info msg="Starting detailed IPO information scraping" component=ChittorgarhIPOScrapingService ipo_id=2582 ipo_title="Yaap Digital IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:07+05:30" level=info msg="Successfully extracted and cleaned description" component=HTMLDataExtractor final_text_length=700 final_text_preview="Socradamus Capital Pvt.Ltd. is the book running lead manager and MUFG Intime India Pvt.Ltd. is the r..." method=ExtractCompanyDescription
+time="2026-03-02T19:09:07+05:30" level=info msg="Successfully extracted description from HTML fallback" company_name="Yaap Digital Ltd." component=ChittorgarhIPOScrapingService ipo_id=2582 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=700 text_preview="Socradamus Capital Pvt.Ltd. is the book running lead manager and MUFG Intime India Pvt.Ltd. is the r..."
+time="2026-03-02T19:09:07+05:30" level=warning msg="No content found with any selector" component=HTMLDataExtractor field_type=about selectors_tried=59
+time="2026-03-02T19:09:07+05:30" level=warning msg="No about content found with any selector" component=HTMLDataExtractor method=ExtractCompanyAbout
+time="2026-03-02T19:09:07+05:30" level=warning msg="No about found in JSON or HTML" company_name="Yaap Digital Ltd." component=ChittorgarhIPOScrapingService ipo_id=2582 method=convertChittorgarhDataToIPOWithLogging
+time="2026-03-02T19:09:07+05:30" level=info msg="Successfully extracted IPO data from JSON" component=ChittorgarhIPOScrapingService ipo_id=2582 ipo_title="Yaap Digital IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:07+05:30" level=info msg="Completed detailed IPO information scraping" company_code=YAAP component=ChittorgarhIPOScrapingService has_about=false has_description=true ipo_id=2582 ipo_name="Yaap Digital Ltd." ipo_title="Yaap Digital IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:07+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:09:07.4427317 +0530 IST m=+487.185899201" entity_id=2582 entity_type=IPO meta_company_code=YAAP meta_company_name="Yaap Digital Ltd." meta_status=CLOSED operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:09:07+05:30" level=info msg="IPO upserted successfully" company_code=YAAP ipo_name="Yaap Digital Ltd." stock_id=2582
+time="2026-03-02T19:09:09+05:30" level=info msg="Processing IPO 15/26: Accord Transformer & Switchgear IPO" ipo_index=15 ipo_name="Accord Transformer & Switchgear IPO" slug=accord-transformer-switchgear-ipo total_ipos=26
+time="2026-03-02T19:09:09+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=accord-transformer-switchgear-ipo groww_slug=accord-transformer-switchgear-ipo
+time="2026-03-02T19:09:09+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=51.3020747s
+time="2026-03-02T19:09:09+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(accord-transformer-switchgear-ipo): circuit breaker is open" slug=accord-transformer-switchgear-ipo
+time="2026-03-02T19:09:09+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=51.3020747s
+time="2026-03-02T19:09:09+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(accord-transformer-switchgear-ipo): circuit breaker is open" slug=accord-transformer-switchgear-ipo
+time="2026-03-02T19:09:09+05:30" level=warning msg="Groww failed or 404ed, falling back to Chittorgarh" chitt_slug=accord-transformer-switchgear-ipo error="FetchIPODetails(accord-transformer-switchgear-ipo): circuit breaker is open" slug=accord-transformer-switchgear-ipo
+time="2026-03-02T19:09:09+05:30" level=info msg="Starting detailed IPO information scraping" component=ChittorgarhIPOScrapingService ipo_id=2763 ipo_title="Accord Transformer & Switchgear IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:09+05:30" level=info msg="Successfully extracted and cleaned description" component=HTMLDataExtractor final_text_length=1280 final_text_preview="GYR Capital Advisors Pvt.Ltd. is the book running lead manager and Kfin Technologies Ltd. is the reg..." method=ExtractCompanyDescription
+time="2026-03-02T19:09:09+05:30" level=info msg="Successfully extracted description from HTML fallback" company_name="Accord Transformer & Switchgear Ltd." component=ChittorgarhIPOScrapingService ipo_id=2763 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=1280 text_preview="GYR Capital Advisors Pvt.Ltd. is the book running lead manager and Kfin Technologies Ltd. is the reg..."
+time="2026-03-02T19:09:09+05:30" level=warning msg="No content found with any selector" component=HTMLDataExtractor field_type=about selectors_tried=59
+time="2026-03-02T19:09:09+05:30" level=warning msg="No about content found with any selector" component=HTMLDataExtractor method=ExtractCompanyAbout
+time="2026-03-02T19:09:09+05:30" level=warning msg="No about found in JSON or HTML" company_name="Accord Transformer & Switchgear Ltd." component=ChittorgarhIPOScrapingService ipo_id=2763 method=convertChittorgarhDataToIPOWithLogging
+time="2026-03-02T19:09:09+05:30" level=info msg="Successfully extracted IPO data from JSON" component=ChittorgarhIPOScrapingService ipo_id=2763 ipo_title="Accord Transformer & Switchgear IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:09+05:30" level=info msg="Completed detailed IPO information scraping" company_code="AT&SL" component=ChittorgarhIPOScrapingService has_about=false has_description=true ipo_id=2763 ipo_name="Accord Transformer & Switchgear Ltd." ipo_title="Accord Transformer & Switchgear IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:09+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:09:09.6778434 +0530 IST m=+489.421010901" entity_id=2763 entity_type=IPO meta_company_code="AT&SL" meta_company_name="Accord Transformer & Switchgear Ltd." meta_status=LISTED operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:09:09+05:30" level=info msg="IPO upserted successfully" company_code="AT&SL" ipo_name="Accord Transformer & Switchgear Ltd." stock_id=2763
+time="2026-03-02T19:09:11+05:30" level=info msg="Processing IPO 16/26: Mobilise App IPO" ipo_index=16 ipo_name="Mobilise App IPO" slug=mobilise-app-ipo total_ipos=26
+time="2026-03-02T19:09:11+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=mobilise-app-ipo groww_slug=mobilise-app-ipo
+time="2026-03-02T19:09:11+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=49.0670039s
+time="2026-03-02T19:09:11+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(mobilise-app-ipo): circuit breaker is open" slug=mobilise-app-ipo
+time="2026-03-02T19:09:11+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=49.0670039s
+time="2026-03-02T19:09:11+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(mobilise-app-ipo): circuit breaker is open" slug=mobilise-app-ipo
+time="2026-03-02T19:09:11+05:30" level=warning msg="Groww failed or 404ed, falling back to Chittorgarh" chitt_slug=mobilise-app-ipo error="FetchIPODetails(mobilise-app-ipo): circuit breaker is open" slug=mobilise-app-ipo
+time="2026-03-02T19:09:11+05:30" level=info msg="Starting detailed IPO information scraping" component=ChittorgarhIPOScrapingService ipo_id=2584 ipo_title="Mobilise App IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:11+05:30" level=info msg="Successfully extracted and cleaned description" component=HTMLDataExtractor final_text_length=712 final_text_preview="Incorporated in 2012, Mobilise App Lab Limited is a technology driven firm. The company specialises ..." method=ExtractCompanyDescription
+time="2026-03-02T19:09:11+05:30" level=info msg="Successfully extracted description from HTML fallback" company_name="Mobilise App Lab Ltd." component=ChittorgarhIPOScrapingService ipo_id=2584 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=712 text_preview="Incorporated in 2012, Mobilise App Lab Limited is a technology driven firm. The company specialises ..."
+time="2026-03-02T19:09:11+05:30" level=warning msg="No content found with any selector" component=HTMLDataExtractor field_type=about selectors_tried=59
+time="2026-03-02T19:09:11+05:30" level=warning msg="No about content found with any selector" component=HTMLDataExtractor method=ExtractCompanyAbout
+time="2026-03-02T19:09:11+05:30" level=warning msg="No about found in JSON or HTML" company_name="Mobilise App Lab Ltd." component=ChittorgarhIPOScrapingService ipo_id=2584 method=convertChittorgarhDataToIPOWithLogging
+time="2026-03-02T19:09:11+05:30" level=info msg="Successfully extracted IPO data from JSON" component=ChittorgarhIPOScrapingService ipo_id=2584 ipo_title="Mobilise App IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:11+05:30" level=info msg="Completed detailed IPO information scraping" company_code=MALL component=ChittorgarhIPOScrapingService has_about=false has_description=true ipo_id=2584 ipo_name="Mobilise App Lab Ltd." ipo_title="Mobilise App IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:11+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:09:11.8952918 +0530 IST m=+491.638459301" entity_id=2584 entity_type=IPO meta_company_code=MALL meta_company_name="Mobilise App Lab Ltd." meta_status=LISTED operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:09:11+05:30" level=info msg="IPO upserted successfully" company_code=MALL ipo_name="Mobilise App Lab Ltd." stock_id=2584
+time="2026-03-02T19:09:13+05:30" level=info msg="Processing IPO 17/26: Kiaasa Retail IPO" ipo_index=17 ipo_name="Kiaasa Retail IPO" slug=kiaasa-retail-ipo total_ipos=26
+time="2026-03-02T19:09:13+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=kiaasa-retail-ipo groww_slug=kiaasa-retail-ipo
+time="2026-03-02T19:09:13+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=46.8496565s
+time="2026-03-02T19:09:13+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(kiaasa-retail-ipo): circuit breaker is open" slug=kiaasa-retail-ipo
+time="2026-03-02T19:09:13+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=46.8496565s
+time="2026-03-02T19:09:13+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(kiaasa-retail-ipo): circuit breaker is open" slug=kiaasa-retail-ipo
+time="2026-03-02T19:09:13+05:30" level=warning msg="Groww failed or 404ed, falling back to Chittorgarh" chitt_slug=kiaasa-retail-ipo error="FetchIPODetails(kiaasa-retail-ipo): circuit breaker is open" slug=kiaasa-retail-ipo
+time="2026-03-02T19:09:13+05:30" level=info msg="Starting detailed IPO information scraping" component=ChittorgarhIPOScrapingService ipo_id=2417 ipo_title="Kiaasa Retail IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:14+05:30" level=info msg="Successfully extracted and cleaned description" component=HTMLDataExtractor final_text_length=749 final_text_preview="Expert Global Consultants Pvt.Ltd. is the book running lead manager and Purva Sharegistry (India) Pv..." method=ExtractCompanyDescription
+time="2026-03-02T19:09:14+05:30" level=info msg="Successfully extracted description from HTML fallback" company_name="Kiaasa Retail Ltd." component=ChittorgarhIPOScrapingService ipo_id=2417 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=749 text_preview="Expert Global Consultants Pvt.Ltd. is the book running lead manager and Purva Sharegistry (India) Pv..."
+time="2026-03-02T19:09:14+05:30" level=warning msg="No content found with any selector" component=HTMLDataExtractor field_type=about selectors_tried=59
+time="2026-03-02T19:09:14+05:30" level=warning msg="No about content found with any selector" component=HTMLDataExtractor method=ExtractCompanyAbout
+time="2026-03-02T19:09:14+05:30" level=warning msg="No about found in JSON or HTML" company_name="Kiaasa Retail Ltd." component=ChittorgarhIPOScrapingService ipo_id=2417 method=convertChittorgarhDataToIPOWithLogging
+time="2026-03-02T19:09:14+05:30" level=info msg="Successfully extracted IPO data from JSON" component=ChittorgarhIPOScrapingService ipo_id=2417 ipo_title="Kiaasa Retail IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:14+05:30" level=info msg="Completed detailed IPO information scraping" company_code=KRL component=ChittorgarhIPOScrapingService has_about=false has_description=true ipo_id=2417 ipo_name="Kiaasa Retail Ltd." ipo_title="Kiaasa Retail IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:14+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:09:14.0967805 +0530 IST m=+493.839948001" entity_id=2417 entity_type=IPO meta_company_code=KRL meta_company_name="Kiaasa Retail Ltd." meta_status=LISTED operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:09:14+05:30" level=info msg="IPO upserted successfully" company_code=KRL ipo_name="Kiaasa Retail Ltd." stock_id=2417
+time="2026-03-02T19:09:16+05:30" level=info msg="Processing IPO 18/26: Manilam Industries IPO" ipo_index=18 ipo_name="Manilam Industries IPO" slug=manilam-industries-ipo total_ipos=26
+time="2026-03-02T19:09:16+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=manilam-industries-ipo groww_slug=manilam-industries-ipo
+time="2026-03-02T19:09:16+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=44.6482935s
+time="2026-03-02T19:09:16+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(manilam-industries-ipo): circuit breaker is open" slug=manilam-industries-ipo
+time="2026-03-02T19:09:16+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=44.6482935s
+time="2026-03-02T19:09:16+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(manilam-industries-ipo): circuit breaker is open" slug=manilam-industries-ipo
+time="2026-03-02T19:09:16+05:30" level=warning msg="Groww failed or 404ed, falling back to Chittorgarh" chitt_slug=manilam-industries-ipo error="FetchIPODetails(manilam-industries-ipo): circuit breaker is open" slug=manilam-industries-ipo
+time="2026-03-02T19:09:16+05:30" level=info msg="Starting detailed IPO information scraping" component=ChittorgarhIPOScrapingService ipo_id=2727 ipo_title="Manilam Industries IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:16+05:30" level=info msg="Successfully extracted and cleaned description" component=HTMLDataExtractor final_text_length=304 final_text_preview="The companyΓÇÖs manufacturing plant is located at Village Manda, Bhojipura Nainital Road, Bareilly, ..." method=ExtractCompanyDescription
+time="2026-03-02T19:09:16+05:30" level=info msg="Successfully extracted description from HTML fallback" company_name="Manilam Industries India Ltd." component=ChittorgarhIPOScrapingService ipo_id=2727 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=304 text_preview="The companyΓÇÖs manufacturing plant is located at Village Manda, Bhojipura Nainital Road, Bareilly, ..."
+time="2026-03-02T19:09:16+05:30" level=warning msg="No content found with any selector" component=HTMLDataExtractor field_type=about selectors_tried=59
+time="2026-03-02T19:09:16+05:30" level=warning msg="No about content found with any selector" component=HTMLDataExtractor method=ExtractCompanyAbout
+time="2026-03-02T19:09:16+05:30" level=warning msg="No about found in JSON or HTML" company_name="Manilam Industries India Ltd." component=ChittorgarhIPOScrapingService ipo_id=2727 method=convertChittorgarhDataToIPOWithLogging
+time="2026-03-02T19:09:16+05:30" level=info msg="Successfully extracted IPO data from JSON" component=ChittorgarhIPOScrapingService ipo_id=2727 ipo_title="Manilam Industries IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:16+05:30" level=info msg="Completed detailed IPO information scraping" company_code=MIIL component=ChittorgarhIPOScrapingService has_about=false has_description=true ipo_id=2727 ipo_name="Manilam Industries India Ltd." ipo_title="Manilam Industries IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:16+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:09:16.3385744 +0530 IST m=+496.081741901" entity_id=2727 entity_type=IPO meta_company_code=MIIL meta_company_name="Manilam Industries India Ltd." meta_status=LISTED operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:09:16+05:30" level=info msg="IPO upserted successfully" company_code=MIIL ipo_name="Manilam Industries India Ltd." stock_id=2727
+time="2026-03-02T19:09:18+05:30" level=info msg="Processing IPO 19/26: Yashhtej Industries (India) IPO" ipo_index=19 ipo_name="Yashhtej Industries (India) IPO" slug=yashhtej-industries-india-ipo total_ipos=26
+time="2026-03-02T19:09:18+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=yashhtej-industries-india-ipo groww_slug=yashhtej-industries-india-ipo
+time="2026-03-02T19:09:18+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=42.4062895s
+time="2026-03-02T19:09:18+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(yashhtej-industries-india-ipo): circuit breaker is open" slug=yashhtej-industries-india-ipo
+time="2026-03-02T19:09:18+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=42.4062895s
+time="2026-03-02T19:09:18+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(yashhtej-industries-india-ipo): circuit breaker is open" slug=yashhtej-industries-india-ipo
+time="2026-03-02T19:09:18+05:30" level=warning msg="Groww failed or 404ed, falling back to Chittorgarh" chitt_slug=yashhtej-industries-india-ipo error="FetchIPODetails(yashhtej-industries-india-ipo): circuit breaker is open" slug=yashhtej-industries-india-ipo
+time="2026-03-02T19:09:18+05:30" level=info msg="Starting detailed IPO information scraping" component=ChittorgarhIPOScrapingService ipo_id=2700 ipo_title="Yashhtej Industries (India) IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:18+05:30" level=error msg="Failed to parse IPO JSON data" component=ChittorgarhIPOScrapingService error="json: cannot unmarshal string into Go struct field ChittorgarhIPOData.issue_price_lower of type float64" ipo_id=2700 ipo_title="Yashhtej Industries (India) IPO" method=extractIPODataFromJSONWithLogging
+time="2026-03-02T19:09:18+05:30" level=warning msg="JSON extraction failed, falling back to HTML parsing" component=ChittorgarhIPOScrapingService error="failed to parse IPO JSON data: json: cannot unmarshal string into Go struct field ChittorgarhIPOData.issue_price_lower of type float64" ipo_id=2700 ipo_title="Yashhtej Industries (India) IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:18+05:30" level=info msg="Successfully extracted and cleaned description" component=HTMLDataExtractor final_text_length=549 final_text_preview="Incorporated in 2018,Yashhtej Industries (India) Limited is engaged in the business of manufacturing..." method=ExtractCompanyDescription
+time="2026-03-02T19:09:18+05:30" level=info msg="Successfully extracted description from HTML" component=ChittorgarhIPOScrapingService extraction_type=description ipo_id=2700 ipo_title="Yashhtej Industries (India) IPO" method=buildIPOModelFromExtractedDataWithLogging text_length=549 text_preview="Incorporated in 2018,Yashhtej Industries (India) Limited is engaged in the business of manufacturing..."
+time="2026-03-02T19:09:18+05:30" level=warning msg="No content found with any selector" component=HTMLDataExtractor field_type=about selectors_tried=59
+time="2026-03-02T19:09:18+05:30" level=warning msg="No about content found with any selector" component=HTMLDataExtractor method=ExtractCompanyAbout
+time="2026-03-02T19:09:18+05:30" level=warning msg="No about found in HTML" component=ChittorgarhIPOScrapingService extraction_type=about ipo_id=2700 ipo_title="Yashhtej Industries (India) IPO" method=buildIPOModelFromExtractedDataWithLogging
+time="2026-03-02T19:09:18+05:30" level=info msg="Completed detailed IPO information scraping" company_code=India component=ChittorgarhIPOScrapingService has_about=false has_description=true ipo_id=2700 ipo_name="Yashhtej Industries (India) IPO Details" ipo_title="Yashhtej Industries (India) IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:18+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:09:18.5634449 +0530 IST m=+498.306612401" entity_id=2700 entity_type=IPO meta_company_code=India meta_company_name="Yashhtej Industries (India) IPO Details" meta_status=UNKNOWN operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:09:18+05:30" level=info msg="IPO upserted successfully" company_code=India ipo_name="Yashhtej Industries (India) IPO Details" stock_id=2700
+time="2026-03-02T19:09:20+05:30" level=info msg="Processing IPO 20/26: Fractal Industries IPO" ipo_index=20 ipo_name="Fractal Industries IPO" slug=fractal-industries-ipo total_ipos=26
+time="2026-03-02T19:09:20+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=fractal-industries-ipo groww_slug=fractal-industries-ipo
+time="2026-03-02T19:09:20+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=40.1810741s
+time="2026-03-02T19:09:20+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(fractal-industries-ipo): circuit breaker is open" slug=fractal-industries-ipo
+time="2026-03-02T19:09:20+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=40.1805628s
+time="2026-03-02T19:09:20+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(fractal-industries-ipo): circuit breaker is open" slug=fractal-industries-ipo
+time="2026-03-02T19:09:20+05:30" level=warning msg="Groww failed or 404ed, falling back to Chittorgarh" chitt_slug=fractal-industries-ipo error="FetchIPODetails(fractal-industries-ipo): circuit breaker is open" slug=fractal-industries-ipo
+time="2026-03-02T19:09:20+05:30" level=info msg="Starting detailed IPO information scraping" component=ChittorgarhIPOScrapingService ipo_id=2780 ipo_title="Fractal Industries IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:20+05:30" level=info msg="Successfully extracted and cleaned description" component=HTMLDataExtractor final_text_length=17 final_text_preview="Business Models:." method=ExtractCompanyDescription
+time="2026-03-02T19:09:20+05:30" level=info msg="Successfully extracted description from HTML fallback" company_name="Fractal Industries Ltd." component=ChittorgarhIPOScrapingService ipo_id=2780 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=17 text_preview="Business Models:."
+time="2026-03-02T19:09:20+05:30" level=info msg="Successfully extracted and cleaned about" component=HTMLDataExtractor final_text_length=17 final_text_preview="Business Models:." method=ExtractCompanyAbout
+time="2026-03-02T19:09:20+05:30" level=info msg="Successfully extracted about from HTML fallback" company_name="Fractal Industries Ltd." component=ChittorgarhIPOScrapingService ipo_id=2780 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=17 text_preview="Business Models:."
+time="2026-03-02T19:09:20+05:30" level=info msg="Successfully extracted IPO data from JSON" component=ChittorgarhIPOScrapingService ipo_id=2780 ipo_title="Fractal Industries IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:20+05:30" level=info msg="Completed detailed IPO information scraping" company_code=FIL component=ChittorgarhIPOScrapingService has_about=true has_description=true ipo_id=2780 ipo_name="Fractal Industries Ltd." ipo_title="Fractal Industries IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:20+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:09:20.7383793 +0530 IST m=+500.481546801" entity_id=2780 entity_type=IPO meta_company_code=FIL meta_company_name="Fractal Industries Ltd." meta_status=LISTED operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:09:20+05:30" level=info msg="IPO upserted successfully" company_code=FIL ipo_name="Fractal Industries Ltd." stock_id=2780
+time="2026-03-02T19:09:22+05:30" level=info msg="Processing IPO 21/26: Marushika Technology IPO" ipo_index=21 ipo_name="Marushika Technology IPO" slug=marushika-technology-ipo total_ipos=26
+time="2026-03-02T19:09:22+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=marushika-technology-ipo groww_slug=marushika-technology-ipo
+time="2026-03-02T19:09:22+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=38.0063768s
+time="2026-03-02T19:09:22+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(marushika-technology-ipo): circuit breaker is open" slug=marushika-technology-ipo
+time="2026-03-02T19:09:22+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=38.0063768s
+time="2026-03-02T19:09:22+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(marushika-technology-ipo): circuit breaker is open" slug=marushika-technology-ipo
+time="2026-03-02T19:09:22+05:30" level=warning msg="Groww failed or 404ed, falling back to Chittorgarh" chitt_slug=marushika-technology-ipo error="FetchIPODetails(marushika-technology-ipo): circuit breaker is open" slug=marushika-technology-ipo
+time="2026-03-02T19:09:22+05:30" level=info msg="Starting detailed IPO information scraping" component=ChittorgarhIPOScrapingService ipo_id=2606 ipo_title="Marushika Technology IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:22+05:30" level=info msg="Successfully extracted and cleaned description" component=HTMLDataExtractor final_text_length=321 final_text_preview="Business Verticals The company primarily follows Business to Business (B2B) business model and Busin..." method=ExtractCompanyDescription
+time="2026-03-02T19:09:22+05:30" level=info msg="Successfully extracted description from HTML fallback" company_name="Marushika Technology Ltd." component=ChittorgarhIPOScrapingService ipo_id=2606 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=321 text_preview="Business Verticals The company primarily follows Business to Business (B2B) business model and Busin..."
+time="2026-03-02T19:09:22+05:30" level=info msg="Successfully extracted and cleaned about" component=HTMLDataExtractor final_text_length=302 final_text_preview="The company primarily follows Business to Business (B2B) business model and Business to Government (..." method=ExtractCompanyAbout
+time="2026-03-02T19:09:22+05:30" level=info msg="Successfully extracted about from HTML fallback" company_name="Marushika Technology Ltd." component=ChittorgarhIPOScrapingService ipo_id=2606 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=302 text_preview="The company primarily follows Business to Business (B2B) business model and Business to Government (..."
+time="2026-03-02T19:09:22+05:30" level=info msg="Successfully extracted IPO data from JSON" component=ChittorgarhIPOScrapingService ipo_id=2606 ipo_title="Marushika Technology IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:22+05:30" level=info msg="Completed detailed IPO information scraping" company_code=MTL component=ChittorgarhIPOScrapingService has_about=true has_description=true ipo_id=2606 ipo_name="Marushika Technology Ltd." ipo_title="Marushika Technology IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:22+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:09:22.9042008 +0530 IST m=+502.647368301" entity_id=2606 entity_type=IPO meta_company_code=MTL meta_company_name="Marushika Technology Ltd." meta_status=LISTED operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:09:22+05:30" level=info msg="IPO upserted successfully" company_code=MTL ipo_name="Marushika Technology Ltd." stock_id=2606
+time="2026-03-02T19:09:24+05:30" level=info msg="Processing IPO 22/26: PAN HR Solutions IPO" ipo_index=22 ipo_name="PAN HR Solutions IPO" slug=pan-hr-solutions-ipo total_ipos=26
+time="2026-03-02T19:09:24+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=pan-hr-solutions-ipo groww_slug=pan-hr-solutions-ipo
+time="2026-03-02T19:09:24+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=35.8397067s
+time="2026-03-02T19:09:24+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(pan-hr-solutions-ipo): circuit breaker is open" slug=pan-hr-solutions-ipo
+time="2026-03-02T19:09:24+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=35.8397067s
+time="2026-03-02T19:09:24+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(pan-hr-solutions-ipo): circuit breaker is open" slug=pan-hr-solutions-ipo
+time="2026-03-02T19:09:24+05:30" level=warning msg="Groww failed or 404ed, falling back to Chittorgarh" chitt_slug=pan-hr-solutions-ipo error="FetchIPODetails(pan-hr-solutions-ipo): circuit breaker is open" slug=pan-hr-solutions-ipo
+time="2026-03-02T19:09:24+05:30" level=info msg="Starting detailed IPO information scraping" component=ChittorgarhIPOScrapingService ipo_id=2759 ipo_title="PAN HR Solutions IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:25+05:30" level=info msg="Successfully extracted and cleaned description" component=HTMLDataExtractor final_text_length=745 final_text_preview="Marwadi Chandarana Intermediaries Brokers Pvt.Ltd. is the book running lead manager and Maashitla Se..." method=ExtractCompanyDescription
+time="2026-03-02T19:09:25+05:30" level=info msg="Successfully extracted description from HTML fallback" company_name="PAN HR Solutions Ltd." component=ChittorgarhIPOScrapingService ipo_id=2759 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=745 text_preview="Marwadi Chandarana Intermediaries Brokers Pvt.Ltd. is the book running lead manager and Maashitla Se..."
+time="2026-03-02T19:09:25+05:30" level=warning msg="No content found with any selector" component=HTMLDataExtractor field_type=about selectors_tried=59
+time="2026-03-02T19:09:25+05:30" level=warning msg="No about content found with any selector" component=HTMLDataExtractor method=ExtractCompanyAbout
+time="2026-03-02T19:09:25+05:30" level=warning msg="No about found in JSON or HTML" company_name="PAN HR Solutions Ltd." component=ChittorgarhIPOScrapingService ipo_id=2759 method=convertChittorgarhDataToIPOWithLogging
+time="2026-03-02T19:09:25+05:30" level=info msg="Successfully extracted IPO data from JSON" component=ChittorgarhIPOScrapingService ipo_id=2759 ipo_title="PAN HR Solutions IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:25+05:30" level=info msg="Completed detailed IPO information scraping" company_code=PAN component=ChittorgarhIPOScrapingService has_about=false has_description=true ipo_id=2759 ipo_name="PAN HR Solutions Ltd." ipo_title="PAN HR Solutions IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:25+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:09:25.1274492 +0530 IST m=+504.870616701" entity_id=2759 entity_type=IPO meta_company_code=PAN meta_company_name="PAN HR Solutions Ltd." meta_status=LISTED operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:09:25+05:30" level=info msg="IPO upserted successfully" company_code=PAN ipo_name="PAN HR Solutions Ltd." stock_id=2759
+time="2026-03-02T19:09:27+05:30" level=info msg="Processing IPO 23/26: Biopol Chemicals IPO" ipo_index=23 ipo_name="Biopol Chemicals IPO" slug=biopol-chemicals-ipo total_ipos=26
+time="2026-03-02T19:09:27+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=biopol-chemicals-ipo groww_slug=biopol-chemicals-ipo
+time="2026-03-02T19:09:27+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=33.6167136s
+time="2026-03-02T19:09:27+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(biopol-chemicals-ipo): circuit breaker is open" slug=biopol-chemicals-ipo
+time="2026-03-02T19:09:27+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=33.6167136s
+time="2026-03-02T19:09:27+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(biopol-chemicals-ipo): circuit breaker is open" slug=biopol-chemicals-ipo
+time="2026-03-02T19:09:27+05:30" level=warning msg="Groww failed or 404ed, falling back to Chittorgarh" chitt_slug=biopol-chemicals-ipo error="FetchIPODetails(biopol-chemicals-ipo): circuit breaker is open" slug=biopol-chemicals-ipo
+time="2026-03-02T19:09:27+05:30" level=info msg="Starting detailed IPO information scraping" component=ChittorgarhIPOScrapingService ipo_id=2721 ipo_title="Biopol Chemicals IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:27+05:30" level=info msg="Successfully extracted and cleaned description" component=HTMLDataExtractor final_text_length=123 final_text_preview="The company operates on a business to business (B2B) model, catering to institutional clients rather..." method=ExtractCompanyDescription
+time="2026-03-02T19:09:27+05:30" level=info msg="Successfully extracted description from HTML fallback" company_name="Biopol Chemicals Ltd." component=ChittorgarhIPOScrapingService ipo_id=2721 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=123 text_preview="The company operates on a business to business (B2B) model, catering to institutional clients rather..."
+time="2026-03-02T19:09:27+05:30" level=warning msg="No content found with any selector" component=HTMLDataExtractor field_type=about selectors_tried=59
+time="2026-03-02T19:09:27+05:30" level=warning msg="No about content found with any selector" component=HTMLDataExtractor method=ExtractCompanyAbout
+time="2026-03-02T19:09:27+05:30" level=warning msg="No about found in JSON or HTML" company_name="Biopol Chemicals Ltd." component=ChittorgarhIPOScrapingService ipo_id=2721 method=convertChittorgarhDataToIPOWithLogging
+time="2026-03-02T19:09:27+05:30" level=info msg="Successfully extracted IPO data from JSON" component=ChittorgarhIPOScrapingService ipo_id=2721 ipo_title="Biopol Chemicals IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:27+05:30" level=info msg="Completed detailed IPO information scraping" company_code=BCL component=ChittorgarhIPOScrapingService has_about=false has_description=true ipo_id=2721 ipo_name="Biopol Chemicals Ltd." ipo_title="Biopol Chemicals IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:27+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:09:27.3457354 +0530 IST m=+507.088902901" entity_id=2721 entity_type=IPO meta_company_code=BCL meta_company_name="Biopol Chemicals Ltd." meta_status=LISTED operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:09:27+05:30" level=info msg="IPO upserted successfully" company_code=BCL ipo_name="Biopol Chemicals Ltd." stock_id=2721
+time="2026-03-02T19:09:29+05:30" level=info msg="Processing IPO 24/26: Grover Jewells IPO" ipo_index=24 ipo_name="Grover Jewells IPO" slug=grover-jewells-ipo total_ipos=26
+time="2026-03-02T19:09:29+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=grover-jewells-ipo groww_slug=grover-jewells-ipo
+time="2026-03-02T19:09:29+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=31.3989658s
+time="2026-03-02T19:09:29+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(grover-jewells-ipo): circuit breaker is open" slug=grover-jewells-ipo
+time="2026-03-02T19:09:29+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=31.3989658s
+time="2026-03-02T19:09:29+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(grover-jewells-ipo): circuit breaker is open" slug=grover-jewells-ipo
+time="2026-03-02T19:09:29+05:30" level=warning msg="Groww failed or 404ed, falling back to Chittorgarh" chitt_slug=grover-jewells-ipo error="FetchIPODetails(grover-jewells-ipo): circuit breaker is open" slug=grover-jewells-ipo
+time="2026-03-02T19:09:29+05:30" level=info msg="Starting detailed IPO information scraping" component=ChittorgarhIPOScrapingService ipo_id=2731 ipo_title="Grover Jewells IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:29+05:30" level=info msg="Successfully extracted and cleaned description" component=HTMLDataExtractor final_text_length=1229 final_text_preview="Finshore Management Services Ltd. is the book running lead manager and Maashitla Securities Pvt.Ltd...." method=ExtractCompanyDescription
+time="2026-03-02T19:09:29+05:30" level=info msg="Successfully extracted description from HTML fallback" company_name="Grover Jewells Ltd." component=ChittorgarhIPOScrapingService ipo_id=2731 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=1229 text_preview="Finshore Management Services Ltd. is the book running lead manager and Maashitla Securities Pvt.Ltd...."
+time="2026-03-02T19:09:29+05:30" level=warning msg="No content found with any selector" component=HTMLDataExtractor field_type=about selectors_tried=59
+time="2026-03-02T19:09:29+05:30" level=warning msg="No about content found with any selector" component=HTMLDataExtractor method=ExtractCompanyAbout
+time="2026-03-02T19:09:29+05:30" level=warning msg="No about found in JSON or HTML" company_name="Grover Jewells Ltd." component=ChittorgarhIPOScrapingService ipo_id=2731 method=convertChittorgarhDataToIPOWithLogging
+time="2026-03-02T19:09:29+05:30" level=info msg="Successfully extracted IPO data from JSON" component=ChittorgarhIPOScrapingService ipo_id=2731 ipo_title="Grover Jewells IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:29+05:30" level=info msg="Completed detailed IPO information scraping" company_code=GJL component=ChittorgarhIPOScrapingService has_about=false has_description=true ipo_id=2731 ipo_name="Grover Jewells Ltd." ipo_title="Grover Jewells IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:29+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:09:29.5429388 +0530 IST m=+509.286106301" entity_id=2731 entity_type=IPO meta_company_code=GJL meta_company_name="Grover Jewells Ltd." meta_status=LISTED operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:09:29+05:30" level=info msg="IPO upserted successfully" company_code=GJL ipo_name="Grover Jewells Ltd." stock_id=2731
+time="2026-03-02T19:09:31+05:30" level=info msg="Processing IPO 25/26: Brandman Retail IPO" ipo_index=25 ipo_name="Brandman Retail IPO" slug=brandman-retail-ipo total_ipos=26
+time="2026-03-02T19:09:31+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=brandman-retail-ipo groww_slug=brandman-retail-ipo
+time="2026-03-02T19:09:31+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=29.2015197s
+time="2026-03-02T19:09:31+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(brandman-retail-ipo): circuit breaker is open" slug=brandman-retail-ipo
+time="2026-03-02T19:09:31+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=29.2015197s
+time="2026-03-02T19:09:31+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(brandman-retail-ipo): circuit breaker is open" slug=brandman-retail-ipo
+time="2026-03-02T19:09:31+05:30" level=warning msg="Groww failed or 404ed, falling back to Chittorgarh" chitt_slug=brandman-retail-ipo error="FetchIPODetails(brandman-retail-ipo): circuit breaker is open" slug=brandman-retail-ipo
+time="2026-03-02T19:09:31+05:30" level=info msg="Starting detailed IPO information scraping" component=ChittorgarhIPOScrapingService ipo_id=2274 ipo_title="Brandman Retail IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:31+05:30" level=info msg="Successfully extracted and cleaned description" component=HTMLDataExtractor final_text_length=1021 final_text_preview="Gretex Corporate Services Ltd. is the book running lead manager and Bigshare Services Pvt.Ltd. is th..." method=ExtractCompanyDescription
+time="2026-03-02T19:09:31+05:30" level=info msg="Successfully extracted description from HTML fallback" company_name="Brandman Retail Ltd." component=ChittorgarhIPOScrapingService ipo_id=2274 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=1021 text_preview="Gretex Corporate Services Ltd. is the book running lead manager and Bigshare Services Pvt.Ltd. is th..."
+time="2026-03-02T19:09:31+05:30" level=info msg="Successfully extracted and cleaned about" component=HTMLDataExtractor final_text_length=4531 final_text_preview="SME Brandman Retail IPO is a book build issue of Γé╣86.09 crores. The issue is entirely a fresh issu..." method=ExtractCompanyAbout
+time="2026-03-02T19:09:31+05:30" level=info msg="Successfully extracted about from HTML fallback" company_name="Brandman Retail Ltd." component=ChittorgarhIPOScrapingService ipo_id=2274 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=4531 text_preview="SME Brandman Retail IPO is a book build issue of Γé╣86.09 crores. The issue is entirely a fresh issu..."
+time="2026-03-02T19:09:31+05:30" level=info msg="Successfully extracted IPO data from JSON" component=ChittorgarhIPOScrapingService ipo_id=2274 ipo_title="Brandman Retail IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:31+05:30" level=info msg="Completed detailed IPO information scraping" company_code=BRL component=ChittorgarhIPOScrapingService has_about=true has_description=true ipo_id=2274 ipo_name="Brandman Retail Ltd." ipo_title="Brandman Retail IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:31+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:09:31.7492531 +0530 IST m=+511.492420601" entity_id=2274 entity_type=IPO meta_company_code=BRL meta_company_name="Brandman Retail Ltd." meta_status=LISTED operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:09:31+05:30" level=info msg="IPO upserted successfully" company_code=BRL ipo_name="Brandman Retail Ltd." stock_id=2274
+time="2026-03-02T19:09:33+05:30" level=info msg="Processing IPO 26/26: CKK Retail Mart IPO" ipo_index=26 ipo_name="CKK Retail Mart IPO" slug=c-k-k-retail-mart-ipo total_ipos=26
+time="2026-03-02T19:09:33+05:30" level=info msg="Matched Chittorgarh IPO to Groww using Entity Resolution" chittorgarh_slug=c-k-k-retail-mart-ipo groww_slug=c-k-k-retail-mart-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.9937309s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(c-k-k-retail-mart-ipo): circuit breaker is open" slug=c-k-k-retail-mart-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.9937309s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(c-k-k-retail-mart-ipo): circuit breaker is open" slug=c-k-k-retail-mart-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Groww failed or 404ed, falling back to Chittorgarh" chitt_slug=c-k-k-retail-mart-ipo error="FetchIPODetails(c-k-k-retail-mart-ipo): circuit breaker is open" slug=c-k-k-retail-mart-ipo
+time="2026-03-02T19:09:33+05:30" level=info msg="Starting detailed IPO information scraping" component=ChittorgarhIPOScrapingService ipo_id=2409 ipo_title="CKK Retail Mart IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:33+05:30" level=info msg="Successfully extracted and cleaned description" component=HTMLDataExtractor final_text_length=287 final_text_preview="Oneview Corporate Advisors Pvt.Ltd. is the book running lead manager and Bigshare Services Pvt.Ltd. ..." method=ExtractCompanyDescription
+time="2026-03-02T19:09:33+05:30" level=info msg="Successfully extracted description from HTML fallback" company_name="CKK Retail Mart Ltd." component=ChittorgarhIPOScrapingService ipo_id=2409 method=convertChittorgarhDataToIPOWithLogging source=html_fallback text_length=287 text_preview="Oneview Corporate Advisors Pvt.Ltd. is the book running lead manager and Bigshare Services Pvt.Ltd. ..."
+time="2026-03-02T19:09:33+05:30" level=warning msg="No content found with any selector" component=HTMLDataExtractor field_type=about selectors_tried=59
+time="2026-03-02T19:09:33+05:30" level=warning msg="No about content found with any selector" component=HTMLDataExtractor method=ExtractCompanyAbout
+time="2026-03-02T19:09:33+05:30" level=warning msg="No about found in JSON or HTML" company_name="CKK Retail Mart Ltd." component=ChittorgarhIPOScrapingService ipo_id=2409 method=convertChittorgarhDataToIPOWithLogging
+time="2026-03-02T19:09:33+05:30" level=info msg="Successfully extracted IPO data from JSON" component=ChittorgarhIPOScrapingService ipo_id=2409 ipo_title="CKK Retail Mart IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:33+05:30" level=info msg="Completed detailed IPO information scraping" company_code=CKK component=ChittorgarhIPOScrapingService has_about=false has_description=true ipo_id=2409 ipo_name="CKK Retail Mart Ltd." ipo_title="CKK Retail Mart IPO" method=ScrapeDetailedIPOInformation
+time="2026-03-02T19:09:33+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:09:33.95953 +0530 IST m=+513.702697501" entity_id=2409 entity_type=IPO meta_company_code=CKK meta_company_name="CKK Retail Mart Ltd." meta_status=LISTED operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:09:33+05:30" level=info msg="IPO upserted successfully" company_code=CKK ipo_name="CKK Retail Mart Ltd." stock_id=2409
+time="2026-03-02T19:09:33+05:30" level=info msg="Processing 36 remaining Groww slugs not found in Chittorgarh..."
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7883922s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(msafe-equipments-ipo): circuit breaker is open" slug=msafe-equipments-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7883922s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(msafe-equipments-ipo): circuit breaker is open" slug=msafe-equipments-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=msafe-equipments-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7883922s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(snapdeal-ipo): circuit breaker is open" slug=snapdeal-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7883922s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(snapdeal-ipo): circuit breaker is open" slug=snapdeal-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=snapdeal-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7878778s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(kent-ro-ipo): circuit breaker is open" slug=kent-ro-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7878778s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(kent-ro-ipo): circuit breaker is open" slug=kent-ro-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=kent-ro-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7878778s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(oyo-ipo): circuit breaker is open" slug=oyo-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7878778s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(oyo-ipo): circuit breaker is open" slug=oyo-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=oyo-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7872652s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(boat-ipo): circuit breaker is open" slug=boat-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7872652s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(boat-ipo): circuit breaker is open" slug=boat-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=boat-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7872652s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(curefoods-ipo): circuit breaker is open" slug=curefoods-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7872652s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(curefoods-ipo): circuit breaker is open" slug=curefoods-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=curefoods-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7867226s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(arohan-financial-ipo): circuit breaker is open" slug=arohan-financial-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7867226s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(arohan-financial-ipo): circuit breaker is open" slug=arohan-financial-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=arohan-financial-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7867226s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(shayona-engineering-ipo): circuit breaker is open" slug=shayona-engineering-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7867226s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(shayona-engineering-ipo): circuit breaker is open" slug=shayona-engineering-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=shayona-engineering-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7867226s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(hero-fincrop-limited-ipo): circuit breaker is open" slug=hero-fincrop-limited-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7867226s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(hero-fincrop-limited-ipo): circuit breaker is open" slug=hero-fincrop-limited-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=hero-fincrop-limited-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7867226s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(hero-future-energies-ipo): circuit breaker is open" slug=hero-future-energies-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7867226s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(hero-future-energies-ipo): circuit breaker is open" slug=hero-future-energies-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=hero-future-energies-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7867226s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7867226s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(milky-mist-ipo): circuit breaker is open" slug=milky-mist-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(milky-mist-ipo): circuit breaker is open" slug=milky-mist-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=milky-mist-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7861989s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(hannah-joseph-ipo): circuit breaker is open" slug=hannah-joseph-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7861989s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(hannah-joseph-ipo): circuit breaker is open" slug=hannah-joseph-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=hannah-joseph-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7861989s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(hero-motors-ipo): circuit breaker is open" slug=hero-motors-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7861989s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(hero-motors-ipo): circuit breaker is open" slug=hero-motors-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=hero-motors-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7861989s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(servify-ipo): circuit breaker is open" slug=servify-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7861989s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(servify-ipo): circuit breaker is open" slug=servify-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=servify-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7861989s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(droom-technology-ipo): circuit breaker is open" slug=droom-technology-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7861989s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(droom-technology-ipo): circuit breaker is open" slug=droom-technology-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=droom-technology-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7861989s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(pharmeasy-ipo): circuit breaker is open" slug=pharmeasy-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7861989s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(pharmeasy-ipo): circuit breaker is open" slug=pharmeasy-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=pharmeasy-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7861989s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(shadowfax-ipo): circuit breaker is open" slug=shadowfax-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7861989s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(shadowfax-ipo): circuit breaker is open" slug=shadowfax-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=shadowfax-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7856715s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(bajaj-energy-ipo): circuit breaker is open" slug=bajaj-energy-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7856715s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(bajaj-energy-ipo): circuit breaker is open" slug=bajaj-energy-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=bajaj-energy-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7856715s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(haldirams-snacks-foods-ipo): circuit breaker is open" slug=haldirams-snacks-foods-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7856715s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(haldirams-snacks-foods-ipo): circuit breaker is open" slug=haldirams-snacks-foods-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=haldirams-snacks-foods-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7851303s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(prestige-hospitality-ventures-ipo): circuit breaker is open" slug=prestige-hospitality-ventures-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7851303s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(prestige-hospitality-ventures-ipo): circuit breaker is open" slug=prestige-hospitality-ventures-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=prestige-hospitality-ventures-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7851303s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(cult-fit-ipo): circuit breaker is open" slug=cult-fit-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7851303s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(cult-fit-ipo): circuit breaker is open" slug=cult-fit-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=cult-fit-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7851303s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(incred-holdings-ipo): circuit breaker is open" slug=incred-holdings-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7851303s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(incred-holdings-ipo): circuit breaker is open" slug=incred-holdings-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=incred-holdings-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7851303s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(nfp-sampoorna-foods-ipo): circuit breaker is open" slug=nfp-sampoorna-foods-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7851303s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(nfp-sampoorna-foods-ipo): circuit breaker is open" slug=nfp-sampoorna-foods-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=nfp-sampoorna-foods-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7851303s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(reliance-jio-ipo): circuit breaker is open" slug=reliance-jio-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7851303s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(reliance-jio-ipo): circuit breaker is open" slug=reliance-jio-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=reliance-jio-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7846157s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(digilogic-systems-ipo): circuit breaker is open" slug=digilogic-systems-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7846157s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(digilogic-systems-ipo): circuit breaker is open" slug=digilogic-systems-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=digilogic-systems-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7846157s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(fabindia-ipo): circuit breaker is open" slug=fabindia-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7846157s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(fabindia-ipo): circuit breaker is open" slug=fabindia-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=fabindia-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7846157s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(nse-ipo): circuit breaker is open" slug=nse-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7846157s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(nse-ipo): circuit breaker is open" slug=nse-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=nse-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7846157s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(flipkart-ipo): circuit breaker is open" slug=flipkart-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7846157s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(flipkart-ipo): circuit breaker is open" slug=flipkart-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=flipkart-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7846157s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(juniper-green-energy-ipo): circuit breaker is open" slug=juniper-green-energy-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7846157s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(juniper-green-energy-ipo): circuit breaker is open" slug=juniper-green-energy-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=juniper-green-energy-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7840731s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(zepto-ipo): circuit breaker is open" slug=zepto-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7840731s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(zepto-ipo): circuit breaker is open" slug=zepto-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=zepto-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7840731s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(allchem-lifescience-ipo): circuit breaker is open" slug=allchem-lifescience-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7840731s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(allchem-lifescience-ipo): circuit breaker is open" slug=allchem-lifescience-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=allchem-lifescience-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7840731s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(phonepe-ipo): circuit breaker is open" slug=phonepe-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7840731s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(phonepe-ipo): circuit breaker is open" slug=phonepe-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=phonepe-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7840731s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(sbi-mutual-fund-ipo): circuit breaker is open" slug=sbi-mutual-fund-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7840731s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(sbi-mutual-fund-ipo): circuit breaker is open" slug=sbi-mutual-fund-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=sbi-mutual-fund-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7840731s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(vlcc-ipo): circuit breaker is open" slug=vlcc-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7840731s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(vlcc-ipo): circuit breaker is open" slug=vlcc-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=vlcc-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7835419s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(krm-ayurveda-ipo): circuit breaker is open" slug=krm-ayurveda-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7835419s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(krm-ayurveda-ipo): circuit breaker is open" slug=krm-ayurveda-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=krm-ayurveda-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7835419s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(cardekho-ipo): circuit breaker is open" slug=cardekho-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=26.7835419s
+time="2026-03-02T19:09:33+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(cardekho-ipo): circuit breaker is open" slug=cardekho-ipo
+time="2026-03-02T19:09:33+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=0 slug=cardekho-ipo
+time="2026-03-02T19:09:33+05:30" level=info msg="Retry 1/2: Processing 36 slugs that failed due to circuit breaker"
+19:09:46 | 200 |    111.7183ms | 192.168.0.103 | GET | /api/v2/ipos/feed | -
+time="2026-03-02T19:10:03+05:30" level=info msg="Circuit breaker transitioned to half-open state" circuit_breaker=groww-scraper state=HALF_OPEN
+time="2026-03-02T19:10:04+05:30" level=warning msg="Function failed, retrying after backoff" attempt=1 component=RetryWithExponentialBackoff delay=900ms error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/nse-ipo" max_attempts=3
+time="2026-03-02T19:10:04+05:30" level=warning msg="Function failed, retrying after backoff" attempt=2 component=RetryWithExponentialBackoff delay=1.8s error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/nse-ipo" max_attempts=3
+time="2026-03-02T19:10:06+05:30" level=error msg="Function failed after all retry attempts" component=RetryWithExponentialBackoff final_error="HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/nse-ipo" max_attempts=3
+time="2026-03-02T19:10:06+05:30" level=error msg="Circuit breaker opened due to failures" circuit_breaker=groww-scraper failure_count=6 state=OPEN timeout=1m0s
+time="2026-03-02T19:10:06+05:30" level=warning msg="Circuit breaker recorded failure" circuit_breaker=groww-scraper failure_count=6 max_failures=5 state=OPEN
+time="2026-03-02T19:10:06+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(nse-ipo): failed after 3 attempts: HTTP 404 from https://cmsapi.groww.in/api/v1/ipo-product-content/nse-ipo" slug=nse-ipo
+time="2026-03-02T19:10:06+05:30" level=info msg="Audit log entry" audit_timestamp="2026-03-02 19:10:06.8532906 +0530 IST m=+546.596458101" entity_id=GROWW-nse-ipo entity_type=IPO meta_company_code=national-stock-exchange-nse meta_company_name="National Stock Exchange (NSE)" meta_status=UPCOMING operation=CREATE service_name=ipo-service success=true
+time="2026-03-02T19:10:06+05:30" level=info msg="IPO upserted successfully" company_code=national-stock-exchange-nse ipo_name="National Stock Exchange (NSE)" stock_id=GROWW-nse-ipo
+time="2026-03-02T19:10:06+05:30" level=info msg="Successfully saved Groww-only IPO: nse-ipo"
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9889231s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9889231s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(boat-ipo): circuit breaker is open" slug=boat-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(boat-ipo): circuit breaker is open" slug=boat-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=boat-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.988572s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(haldirams-snacks-foods-ipo): circuit breaker is open" slug=haldirams-snacks-foods-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.988572s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(haldirams-snacks-foods-ipo): circuit breaker is open" slug=haldirams-snacks-foods-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=haldirams-snacks-foods-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.988572s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(bajaj-energy-ipo): circuit breaker is open" slug=bajaj-energy-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.988572s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(bajaj-energy-ipo): circuit breaker is open" slug=bajaj-energy-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=bajaj-energy-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.988572s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(phonepe-ipo): circuit breaker is open" slug=phonepe-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.988572s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(phonepe-ipo): circuit breaker is open" slug=phonepe-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=phonepe-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9880548s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(digilogic-systems-ipo): circuit breaker is open" slug=digilogic-systems-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9880548s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(digilogic-systems-ipo): circuit breaker is open" slug=digilogic-systems-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=digilogic-systems-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9877411s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(krm-ayurveda-ipo): circuit breaker is open" slug=krm-ayurveda-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9877411s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(krm-ayurveda-ipo): circuit breaker is open" slug=krm-ayurveda-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=krm-ayurveda-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9877411s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9872256s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(kent-ro-ipo): circuit breaker is open" slug=kent-ro-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(kent-ro-ipo): circuit breaker is open" slug=kent-ro-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=kent-ro-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9872256s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(prestige-hospitality-ventures-ipo): circuit breaker is open" slug=prestige-hospitality-ventures-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9872256s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(prestige-hospitality-ventures-ipo): circuit breaker is open" slug=prestige-hospitality-ventures-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=prestige-hospitality-ventures-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9872256s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(vlcc-ipo): circuit breaker is open" slug=vlcc-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9872256s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(vlcc-ipo): circuit breaker is open" slug=vlcc-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=vlcc-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9866396s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(pharmeasy-ipo): circuit breaker is open" slug=pharmeasy-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9866396s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(pharmeasy-ipo): circuit breaker is open" slug=pharmeasy-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=pharmeasy-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9866396s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(hero-future-energies-ipo): circuit breaker is open" slug=hero-future-energies-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9866396s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(hero-future-energies-ipo): circuit breaker is open" slug=hero-future-energies-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=hero-future-energies-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9866396s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(zepto-ipo): circuit breaker is open" slug=zepto-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9866396s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(zepto-ipo): circuit breaker is open" slug=zepto-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=zepto-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9866396s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(oyo-ipo): circuit breaker is open" slug=oyo-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9866396s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(oyo-ipo): circuit breaker is open" slug=oyo-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=oyo-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9866396s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(hero-motors-ipo): circuit breaker is open" slug=hero-motors-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9866396s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(hero-motors-ipo): circuit breaker is open" slug=hero-motors-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=hero-motors-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9860877s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(fabindia-ipo): circuit breaker is open" slug=fabindia-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9860877s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(fabindia-ipo): circuit breaker is open" slug=fabindia-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=fabindia-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9860877s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(allchem-lifescience-ipo): circuit breaker is open" slug=allchem-lifescience-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9860877s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(allchem-lifescience-ipo): circuit breaker is open" slug=allchem-lifescience-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=allchem-lifescience-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9860877s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(incred-holdings-ipo): circuit breaker is open" slug=incred-holdings-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9860877s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(incred-holdings-ipo): circuit breaker is open" slug=incred-holdings-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=incred-holdings-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9860877s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(servify-ipo): circuit breaker is open" slug=servify-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9860877s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(servify-ipo): circuit breaker is open" slug=servify-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=servify-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9855298s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(msafe-equipments-ipo): circuit breaker is open" slug=msafe-equipments-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9855298s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(msafe-equipments-ipo): circuit breaker is open" slug=msafe-equipments-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=msafe-equipments-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9855298s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(sbi-mutual-fund-ipo): circuit breaker is open" slug=sbi-mutual-fund-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9855298s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(sbi-mutual-fund-ipo): circuit breaker is open" slug=sbi-mutual-fund-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=sbi-mutual-fund-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9855298s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(shadowfax-ipo): circuit breaker is open" slug=shadowfax-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9855298s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(shadowfax-ipo): circuit breaker is open" slug=shadowfax-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=shadowfax-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9849815s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(juniper-green-energy-ipo): circuit breaker is open" slug=juniper-green-energy-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9844318s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(juniper-green-energy-ipo): circuit breaker is open" slug=juniper-green-energy-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=juniper-green-energy-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9844318s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(shayona-engineering-ipo): circuit breaker is open" slug=shayona-engineering-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9844318s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(shayona-engineering-ipo): circuit breaker is open" slug=shayona-engineering-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=shayona-engineering-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9844318s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(hero-fincrop-limited-ipo): circuit breaker is open" slug=hero-fincrop-limited-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9844318s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(hero-fincrop-limited-ipo): circuit breaker is open" slug=hero-fincrop-limited-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=hero-fincrop-limited-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9844318s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(droom-technology-ipo): circuit breaker is open" slug=droom-technology-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9844318s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(droom-technology-ipo): circuit breaker is open" slug=droom-technology-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=droom-technology-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9838794s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(nfp-sampoorna-foods-ipo): circuit breaker is open" slug=nfp-sampoorna-foods-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9838794s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(nfp-sampoorna-foods-ipo): circuit breaker is open" slug=nfp-sampoorna-foods-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=nfp-sampoorna-foods-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9838794s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(cult-fit-ipo): circuit breaker is open" slug=cult-fit-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9838794s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(cult-fit-ipo): circuit breaker is open" slug=cult-fit-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=cult-fit-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9838794s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(milky-mist-ipo): circuit breaker is open" slug=milky-mist-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9838794s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(milky-mist-ipo): circuit breaker is open" slug=milky-mist-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=milky-mist-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9838794s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(curefoods-ipo): circuit breaker is open" slug=curefoods-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9838794s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(curefoods-ipo): circuit breaker is open" slug=curefoods-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=curefoods-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9833323s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(arohan-financial-ipo): circuit breaker is open" slug=arohan-financial-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9833323s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(arohan-financial-ipo): circuit breaker is open" slug=arohan-financial-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=arohan-financial-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9833323s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(flipkart-ipo): circuit breaker is open" slug=flipkart-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9833323s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(flipkart-ipo): circuit breaker is open" slug=flipkart-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=flipkart-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9833323s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(hannah-joseph-ipo): circuit breaker is open" slug=hannah-joseph-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9833323s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(hannah-joseph-ipo): circuit breaker is open" slug=hannah-joseph-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=hannah-joseph-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9833323s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(snapdeal-ipo): circuit breaker is open" slug=snapdeal-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9833323s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(snapdeal-ipo): circuit breaker is open" slug=snapdeal-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=snapdeal-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9833323s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(reliance-jio-ipo): circuit breaker is open" slug=reliance-jio-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9827717s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(reliance-jio-ipo): circuit breaker is open" slug=reliance-jio-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=reliance-jio-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9827717s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(cardekho-ipo): circuit breaker is open" slug=cardekho-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=57.9827717s
+time="2026-03-02T19:10:08+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(cardekho-ipo): circuit breaker is open" slug=cardekho-ipo
+time="2026-03-02T19:10:08+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=1 slug=cardekho-ipo
+time="2026-03-02T19:10:08+05:30" level=info msg="Retry 2/2: Processing 35 slugs that failed due to circuit breaker"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9822824s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(bajaj-energy-ipo): circuit breaker is open" slug=bajaj-energy-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9822824s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(bajaj-energy-ipo): circuit breaker is open" slug=bajaj-energy-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=bajaj-energy-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9822824s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(droom-technology-ipo): circuit breaker is open" slug=droom-technology-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9822824s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(droom-technology-ipo): circuit breaker is open" slug=droom-technology-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=droom-technology-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.981592s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(boat-ipo): circuit breaker is open" slug=boat-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.981592s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(boat-ipo): circuit breaker is open" slug=boat-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=boat-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.981592s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(msafe-equipments-ipo): circuit breaker is open" slug=msafe-equipments-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.981592s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(msafe-equipments-ipo): circuit breaker is open" slug=msafe-equipments-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=msafe-equipments-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.981592s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(servify-ipo): circuit breaker is open" slug=servify-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.981592s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(servify-ipo): circuit breaker is open" slug=servify-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=servify-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.981592s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(pharmeasy-ipo): circuit breaker is open" slug=pharmeasy-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.981592s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(pharmeasy-ipo): circuit breaker is open" slug=pharmeasy-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=pharmeasy-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.981592s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(hero-future-energies-ipo): circuit breaker is open" slug=hero-future-energies-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.981592s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(hero-future-energies-ipo): circuit breaker is open" slug=hero-future-energies-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=hero-future-energies-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.981592s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(sbi-mutual-fund-ipo): circuit breaker is open" slug=sbi-mutual-fund-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.981592s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(sbi-mutual-fund-ipo): circuit breaker is open" slug=sbi-mutual-fund-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=sbi-mutual-fund-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.981592s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(kent-ro-ipo): circuit breaker is open" slug=kent-ro-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.981592s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(kent-ro-ipo): circuit breaker is open" slug=kent-ro-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=kent-ro-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(fabindia-ipo): circuit breaker is open" slug=fabindia-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(fabindia-ipo): circuit breaker is open" slug=fabindia-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=fabindia-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(hannah-joseph-ipo): circuit breaker is open" slug=hannah-joseph-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(hannah-joseph-ipo): circuit breaker is open" slug=hannah-joseph-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=hannah-joseph-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(zepto-ipo): circuit breaker is open" slug=zepto-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(zepto-ipo): circuit breaker is open" slug=zepto-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=zepto-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(flipkart-ipo): circuit breaker is open" slug=flipkart-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(flipkart-ipo): circuit breaker is open" slug=flipkart-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=flipkart-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(hero-fincrop-limited-ipo): circuit breaker is open" slug=hero-fincrop-limited-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(hero-fincrop-limited-ipo): circuit breaker is open" slug=hero-fincrop-limited-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=hero-fincrop-limited-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(vlcc-ipo): circuit breaker is open" slug=vlcc-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(vlcc-ipo): circuit breaker is open" slug=vlcc-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=vlcc-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(milky-mist-ipo): circuit breaker is open" slug=milky-mist-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(milky-mist-ipo): circuit breaker is open" slug=milky-mist-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=milky-mist-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(oyo-ipo): circuit breaker is open" slug=oyo-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(oyo-ipo): circuit breaker is open" slug=oyo-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=oyo-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(reliance-jio-ipo): circuit breaker is open" slug=reliance-jio-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(reliance-jio-ipo): circuit breaker is open" slug=reliance-jio-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=reliance-jio-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(arohan-financial-ipo): circuit breaker is open" slug=arohan-financial-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(arohan-financial-ipo): circuit breaker is open" slug=arohan-financial-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=arohan-financial-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(cardekho-ipo): circuit breaker is open" slug=cardekho-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(cardekho-ipo): circuit breaker is open" slug=cardekho-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=cardekho-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(haldirams-snacks-foods-ipo): circuit breaker is open" slug=haldirams-snacks-foods-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(haldirams-snacks-foods-ipo): circuit breaker is open" slug=haldirams-snacks-foods-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=haldirams-snacks-foods-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(shadowfax-ipo): circuit breaker is open" slug=shadowfax-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(shadowfax-ipo): circuit breaker is open" slug=shadowfax-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=shadowfax-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(nfp-sampoorna-foods-ipo): circuit breaker is open" slug=nfp-sampoorna-foods-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(nfp-sampoorna-foods-ipo): circuit breaker is open" slug=nfp-sampoorna-foods-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=nfp-sampoorna-foods-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.980262s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(digilogic-systems-ipo): circuit breaker is open" slug=digilogic-systems-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9787541s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(digilogic-systems-ipo): circuit breaker is open" slug=digilogic-systems-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=digilogic-systems-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9787541s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(juniper-green-energy-ipo): circuit breaker is open" slug=juniper-green-energy-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9787541s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(juniper-green-energy-ipo): circuit breaker is open" slug=juniper-green-energy-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=juniper-green-energy-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9787541s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(prestige-hospitality-ventures-ipo): circuit breaker is open" slug=prestige-hospitality-ventures-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9787541s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(prestige-hospitality-ventures-ipo): circuit breaker is open" slug=prestige-hospitality-ventures-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=prestige-hospitality-ventures-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9787541s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(allchem-lifescience-ipo): circuit breaker is open" slug=allchem-lifescience-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9787541s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(allchem-lifescience-ipo): circuit breaker is open" slug=allchem-lifescience-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=allchem-lifescience-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9787541s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(phonepe-ipo): circuit breaker is open" slug=phonepe-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9787541s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(phonepe-ipo): circuit breaker is open" slug=phonepe-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=phonepe-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9787541s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(cult-fit-ipo): circuit breaker is open" slug=cult-fit-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9787541s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(cult-fit-ipo): circuit breaker is open" slug=cult-fit-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=cult-fit-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9787541s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(hero-motors-ipo): circuit breaker is open" slug=hero-motors-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9787541s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(hero-motors-ipo): circuit breaker is open" slug=hero-motors-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=hero-motors-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9787541s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(snapdeal-ipo): circuit breaker is open" slug=snapdeal-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9787541s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(snapdeal-ipo): circuit breaker is open" slug=snapdeal-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=snapdeal-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9787541s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(curefoods-ipo): circuit breaker is open" slug=curefoods-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9787541s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(curefoods-ipo): circuit breaker is open" slug=curefoods-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=curefoods-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9787541s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(krm-ayurveda-ipo): circuit breaker is open" slug=krm-ayurveda-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9787541s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(krm-ayurveda-ipo): circuit breaker is open" slug=krm-ayurveda-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=krm-ayurveda-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9777299s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(incred-holdings-ipo): circuit breaker is open" slug=incred-holdings-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9777299s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(incred-holdings-ipo): circuit breaker is open" slug=incred-holdings-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=incred-holdings-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9777299s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww CMS content" component=GrowwScraperService error="FetchCMSContent(shayona-engineering-ipo): circuit breaker is open" slug=shayona-engineering-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker is open, blocking request" circuit_breaker=groww-scraper state=OPEN time_remaining=27.9777299s
+time="2026-03-02T19:10:38+05:30" level=warning msg="Failed to fetch Groww IPO details" component=GrowwScraperService error="FetchIPODetails(shayona-engineering-ipo): circuit breaker is open" slug=shayona-engineering-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Circuit breaker open - queuing for retry" max_retries=2 retry=2 slug=shayona-engineering-ipo
+time="2026-03-02T19:10:38+05:30" level=warning msg="Still have 35 slugs that failed after all retries - consider manual review"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: boat-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: hannah-joseph-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: flipkart-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: milky-mist-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: cult-fit-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: pharmeasy-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: hero-future-energies-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: hero-fincrop-limited-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: oyo-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: cardekho-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: digilogic-systems-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: shayona-engineering-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: bajaj-energy-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: sbi-mutual-fund-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: fabindia-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: zepto-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: nfp-sampoorna-foods-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: juniper-green-energy-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: prestige-hospitality-ventures-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: snapdeal-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: haldirams-snacks-foods-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: allchem-lifescience-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: phonepe-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: curefoods-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: krm-ayurveda-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: msafe-equipments-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: vlcc-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: reliance-jio-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: hero-motors-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: incred-holdings-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: shadowfax-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: droom-technology-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: servify-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: kent-ro-ipo"
+time="2026-03-02T19:10:38+05:30" level=warning msg="Pending IPO slug requiring manual review: arohan-financial-ipo"
+time="2026-03-02T19:10:38+05:30" level=info msg="Daily IPO Update Job completed" chittorgarh_fallbacks=18 failures=0 full_success=25 groww_successes=9 overall_success_rate=100 partial_success=2 total_processed=27
+19:08:20 | 200 | 2m17.7982797s | 127.0.0.1 | POST | /api/v1/admin/ipo/daily-update | -
+19:10:50 | 200 |     21.5918ms | 127.0.0.1 | GET | /api/v2/ipos/feed | -
+19:11:15 | 200 |     22.7675ms | 127.0.0.1 | GET | /api/v2/ipos/feed | -
+19:11:16 | 200 |     17.2948ms | 127.0.0.1 | GET | /api/v2/ipos/feed | -
+19:11:23 | 200 |     12.4443ms | 127.0.0.1 | GET | /api/v2/ipos/feed | -
+19:11:25 | 200 |      9.9923ms | 127.0.0.1 | GET | /api/v2/ipos/feed | -
+19:11:31 | 200 |     18.1796ms | 127.0.0.1 | GET | /api/v2/ipos/feed | -
+19:11:33 | 200 |      9.9579ms | 127.0.0.1 | GET | /api/v2/ipos/feed | -
+19:11:35 | 200 |     22.7205ms | 127.0.0.1 | GET | /api/v2/ipos/feed | -
+19:21:57 | 200 |    140.8885ms | 192.168.0.103 | GET | /api/v2/ipos/feed | -
+19:22:41 | 200 |     15.1339ms | 192.168.0.103 | GET | /api/v2/ipos/feed/ | -
+19:22:49 | 200 |     23.0198ms | 192.168.0.103 | GET | /api/v2/ipos/feed/ | -
+19:30:33 | 200 |    102.0229ms | 127.0.0.1 | GET | /api/v2/ipos/feed | -
+19:30:41 | 200 |     27.5007ms | 127.0.0.1 | GET | /api/v2/ipos/feed | -
+19:30:47 | 200 |     27.1396ms | 127.0.0.1 | GET | /api/v2/ipos/feed | -
+19:30:54 | 200 |       7.714ms | 127.0.0.1 | GET | /api/v2/ipos/86b168f0-cd0c-4185-a665-a0aa9ff69680 | -
+19:31:03 | 200 |     24.9868ms | 127.0.0.1 | GET | /api/v2/ipos/feed | -
+19:31:19 | 422 |            0s | 127.0.0.1 | POST | /api/v2/allotment/check | -
+19:31:44 | 422 |            0s | 127.0.0.1 | POST | /api/v2/allotment/check | -
+19:31:51 | 422 |            0s | 127.0.0.1 | POST | /api/v2/allotment/check | -
+19:31:57 | 422 |            0s | 127.0.0.1 | POST | /api/v2/allotment/check | -
+19:32:33 | 422 |            0s | 127.0.0.1 | POST | /api/v2/allotment/check | -
+time="2026-03-02T19:32:54+05:30" level=error msg="Failed to retrieve resolved code" error="record not found"
+time="2026-03-02T19:32:54+05:30" level=info msg="Company name match result" company_code= ipo_id=444c47c2-12ce-413b-b408-be980b3107fc ipo_name="Rajputana Stainless Ltd." match_score=0 registrar_short_code=KFIN threshold=80
+time="2026-03-02T19:32:54+05:30" level=info msg="Registrar code resolved and saved" company_code= ipo_id=444c47c2-12ce-413b-b408-be980b3107fc ipo_name="Rajputana Stainless Ltd." is_resolved=false registrar_short_code=KFIN
+19:32:53 | 503 |    296.7348ms | 127.0.0.1 | POST | /api/v2/allotment/check | -
+19:33:13 | 200 |     22.2595ms | 127.0.0.1 | GET | /api/v2/ipos/feed | -
+19:33:13 | 200 |      5.6793ms | 127.0.0.1 | GET | /api/v2/ipos/86b168f0-cd0c-4185-a665-a0aa9ff69680 | -
+time="2026-03-02T19:33:14+05:30" level=info msg="Company name match result" company_code= ipo_id=444c47c2-12ce-413b-b408-be980b3107fc ipo_name="Rajputana Stainless Ltd." match_score=0 registrar_short_code=KFIN threshold=80
+time="2026-03-02T19:33:14+05:30" level=info msg="Registrar code resolved and saved" company_code= ipo_id=444c47c2-12ce-413b-b408-be980b3107fc ipo_name="Rajputana Stainless Ltd." is_resolved=false registrar_short_code=KFIN
+19:33:13 | 503 |    265.4638ms | 127.0.0.1 | POST | /api/v2/allotment/check | -
+19:47:05 | 200 |      82.031ms | 127.0.0.1 | GET | /api/v2/ipos/feed | -
+19:47:13 | 200 |      5.7892ms | 127.0.0.1 | GET | /api/v2/ipos/f6e09b37-5128-4ba1-b220-93818096f366 | -
+time="2026-03-02T19:47:20+05:30" level=error msg="Failed to retrieve resolved code" error="record not found"
+time="2026-03-02T19:47:21+05:30" level=info msg="Company name match result" company_code= ipo_id=f6e09b37-5128-4ba1-b220-93818096f366 ipo_name="Accord Transformer & Switchgear Ltd." match_score=0 registrar_short_code=KFIN threshold=80
+time="2026-03-02T19:47:21+05:30" level=info msg="Registrar code resolved and saved" company_code= ipo_id=f6e09b37-5128-4ba1-b220-93818096f366 ipo_name="Accord Transformer & Switchgear Ltd." is_resolved=false registrar_short_code=KFIN
+19:47:20 | 503 |    810.3342ms | 127.0.0.1 | POST | /api/v2/allotment/check | -
+19:47:58 | 200 |      7.5815ms | 127.0.0.1 | GET | /api/v2/ipos/f6e09b37-5128-4ba1-b220-93818096f366 | -
+19:51:40 | 200 |     14.4226ms | 192.168.0.103 | GET | /api/v2/ipos/feed/ | -
+19:51:46 | 200 |     17.0452ms | 192.168.0.103 | GET | /api/v2/ipos/feed/ | -
+19:51:51 | 200 |     11.7057ms | 192.168.0.103 | GET | /api/v2/ipos/feed/ | -
+time="2026-03-02T20:34:51+05:30" level=info msg="Shutdown signal received" signal=terminated
+time="2026-03-02T20:34:51+05:30" level=info msg="Server shutdown completed"
+time="2026-03-02T20:34:51+05:30" level=info msg="Application stopped cleanly"
+time="2026-03-02T20:34:51+05:30" level=info msg="Database connection closed"

@@ -1,0 +1,37 @@
+github.com/fenilmodi00/ipo-backend/tools/registrars/bigshare
+github.com/fenilmodi00/ipo-backend/tools/registrars/kfin
+github.com/fenilmodi00/ipo-backend/tools/registrars/mufg
+# github.com/fenilmodi00/ipo-backend/tools/registrars/mufg
+tools\registrars\mufg\client.go:132:96: undefined: shared.AllotmentResult
+tools\registrars\mufg\client.go:189:55: undefined: shared.AllotmentResult
+tools\registrars\mufg\client.go:205:21: undefined: shared.AllotmentResult
+tools\registrars\mufg\client.go:206:19: undefined: shared.StatusNotFound
+tools\registrars\mufg\client.go:212:18: undefined: shared.AllotmentResult
+tools\registrars\mufg\client.go:213:19: undefined: shared.StatusNotFound
+tools\registrars\mufg\client.go:220:20: undefined: shared.AllotmentResult
+tools\registrars\mufg\client.go:228:26: undefined: shared.StatusAllotted
+tools\registrars\mufg\client.go:327:64: undefined: shared.DropdownOption
+tools\registrars\mufg\client.go:374:69: undefined: shared.DropdownOption
+tools\registrars\mufg\client.go:228:26: too many errors
+# github.com/fenilmodi00/ipo-backend/tools/registrars/bigshare
+tools\registrars\bigshare\client.go:88:96: undefined: shared.AllotmentResult
+tools\registrars\bigshare\client.go:153:71: undefined: shared.AllotmentResult
+tools\registrars\bigshare\client.go:154:20: undefined: shared.AllotmentResult
+tools\registrars\bigshare\client.go:155:18: undefined: shared.StatusNotFound
+tools\registrars\bigshare\client.go:171:27: undefined: shared.StatusAllotted
+tools\registrars\bigshare\client.go:173:27: undefined: shared.StatusNotAllotted
+tools\registrars\bigshare\client.go:181:73: undefined: shared.DropdownOption
+tools\registrars\bigshare\client.go:316:64: undefined: shared.DropdownOption
+tools\registrars\bigshare\client.go:337:23: undefined: shared.DropdownOption
+tools\registrars\bigshare\client.go:342:37: undefined: shared.DropdownOption
+tools\registrars\bigshare\client.go:342:37: too many errors
+# github.com/fenilmodi00/ipo-backend/tools/registrars/kfin
+tools\registrars\kfin\client.go:85:96: undefined: shared.AllotmentResult
+tools\registrars\kfin\client.go:114:138: undefined: shared.AllotmentResult
+tools\registrars\kfin\client.go:153:18: undefined: shared.AllotmentResult
+tools\registrars\kfin\client.go:169:73: undefined: shared.AllotmentResult
+tools\registrars\kfin\client.go:170:20: undefined: shared.AllotmentResult
+tools\registrars\kfin\client.go:419:64: undefined: shared.DropdownOption
+tools\registrars\kfin\client.go:469:27: undefined: shared.DropdownOption
+tools\registrars\kfin\client.go:471:23: undefined: shared.DropdownOption
+tools\registrars\kfin\client.go:478:73: undefined: shared.DropdownOption

@@ -1,0 +1,23 @@
+✓ CONTENT VERIFICATION: Task 6 - Add Registrar Code Resolution Step
+
+REQUIRED CHANGES:
+1. Step 3 header: "Registrar Code Resolution" ✓
+2. ADMIN_TOKEN environment variable check ✓
+3. curl POST to /api/v2/admin/registrar/resolve endpoint ✓
+4. X-Admin-Token header ✓
+5. HTTP response parsing (status code and body) ✓
+6. Success condition (HTTP 200) with checkmark ✓
+7. Failure condition with error code and message ✓
+8. Skipped condition when ADMIN_TOKEN not set with warning ✓
+9. Uses API_BASE_URL variable with fallback ✓
+
+PLACEMENT:
+✓ Step 3 added AFTER existing scraper steps (lines 40-61)
+✓ BEFORE database query steps (lines 63-71)
+✓ Endpoint list updated (line 34)
+
+SYNTAX VALIDATION:
+✓ bash -n scripts/run-all-scrapers.sh: PASS
+
+FILE LOCATION: scripts/run-all-scrapers.sh
+TOTAL LINES: 71 (was 46, added 25 lines for Step 3)

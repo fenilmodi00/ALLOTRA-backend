@@ -7,21 +7,27 @@ import (
 	"github.com/fenilmodi00/ipo-backend/models"
 	"github.com/fenilmodi00/ipo-backend/services"
 	"github.com/fenilmodi00/ipo-backend/shared"
+	"github.com/fenilmodi00/ipo-backend/tools/registrars"
+	"github.com/fenilmodi00/ipo-backend/tools/registrars/bigshare"
+	"github.com/fenilmodi00/ipo-backend/tools/registrars/kfin"
+	"github.com/fenilmodi00/ipo-backend/tools/registrars/mufg"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 )
 
 type V2AllotmentHandler struct {
-	IPOService       *services.IPOService
-	AllotmentChecker *services.AllotmentChecker
-	CacheService     *services.CacheService
+	IPOService           *services.IPOService
+	AllotmentChecker     *services.AllotmentChecker
+	CacheService         *services.CacheService
+	RegistrarCodeService *services.RegistrarCodeService
 }
 
-func NewV2AllotmentHandler(ipo *services.IPOService, allotmentChecker *services.AllotmentChecker, cache *services.CacheService) *V2AllotmentHandler {
+func NewV2AllotmentHandler(ipo *services.IPOService, allotmentChecker *services.AllotmentChecker, cache *services.CacheService, registrarCodeService *services.RegistrarCodeService) *V2AllotmentHandler {
 	return &V2AllotmentHandler{
-		IPOService:       ipo,
-		AllotmentChecker: allotmentChecker,
-		CacheService:     cache,
+		IPOService:           ipo,
+		AllotmentChecker:     allotmentChecker,
+		CacheService:         cache,
+		RegistrarCodeService: registrarCodeService,
 	}
 }
 
@@ -64,19 +70,63 @@ func (h *V2AllotmentHandler) CheckAllotment(c *fiber.Ctx) error {
 		return c.Status(404).JSON(shared.NewV2ErrorResponse("NOT_FOUND", "IPO not found", map[string]string{"field": "ipo_id"}))
 	}
 
-	// Check Allotment Status
-	status, sharesAllotted, err := h.AllotmentChecker.CheckAllotmentStatus(c.Context(), ipo, req.PAN)
+	// Determine registrar short code
+	registrarShortCode := ""
+	if ipo.Registrar != "" {
+		client := registrars.GetClient(ipo.Registrar)
+		if client != nil {
+			// Map client to short code (KFIN, BIGSHARE, MUFG)
+			switch client.(type) {
+			case *kfin.Client:
+				registrarShortCode = "KFIN"
+			case *bigshare.Client:
+				registrarShortCode = "BIGSHARE"
+			case *mufg.Client:
+				registrarShortCode = "MUFG"
+			}
+		}
+	}
+
+	if registrarShortCode == "" {
+		return c.Status(503).JSON(shared.NewV2ErrorResponse("SERVICE_UNAVAILABLE", "Registrar not supported", nil))
+	}
+
+	// Try to get resolved code
+	resolvedCode, err := h.RegistrarCodeService.GetResolvedCode(c.Context(), ipo.ID, registrarShortCode)
+	if err != nil || resolvedCode == nil {
+		// Attempt live resolution
+		resolvedCode, err = h.RegistrarCodeService.ResolveCode(c.Context(), ipo.ID, registrarShortCode, ipo.Name)
+		if err != nil || resolvedCode == nil || !resolvedCode.IsResolved {
+			return c.Status(503).JSON(shared.NewV2ErrorResponse("SERVICE_UNAVAILABLE", "Company code not yet resolved", nil))
+		}
+	}
+
+	if resolvedCode.RegistrarCompanyCode == nil || *resolvedCode.RegistrarCompanyCode == "" {
+		resolvedCode, err = h.RegistrarCodeService.ResolveCode(c.Context(), ipo.ID, registrarShortCode, ipo.Name)
+		if err != nil || resolvedCode == nil || !resolvedCode.IsResolved || resolvedCode.RegistrarCompanyCode == nil || *resolvedCode.RegistrarCompanyCode == "" {
+			return c.Status(503).JSON(shared.NewV2ErrorResponse("SERVICE_UNAVAILABLE", "Company code not yet resolved", nil))
+		}
+	}
+
+	client := registrars.GetClient(registrarShortCode)
+	if client == nil {
+		return c.Status(503).JSON(shared.NewV2ErrorResponse("SERVICE_UNAVAILABLE", "Unsupported registrar: "+registrarShortCode, nil))
+	}
+
+	allotmentResult, err := client.CheckAllotment(c.Context(), *resolvedCode.RegistrarCompanyCode, req.PAN)
 	if err != nil {
 		return c.Status(502).JSON(shared.NewV2ErrorResponse("BAD_GATEWAY", "Failed to check allotment status", nil))
 	}
+	if allotmentResult == nil {
+		return c.Status(502).JSON(shared.NewV2ErrorResponse("BAD_GATEWAY", "Failed to check allotment status", nil))
+	}
+
+	status := allotmentResult.Status
+	sharesApplied := allotmentResult.SharesApplied
+	sharesAllotted := allotmentResult.SharesAllotted
 
 	// Build response message
 	message := getAllotmentMessage(status)
-
-	sharesApplied := 0
-	if ipo.MinQty != nil {
-		sharesApplied = *ipo.MinQty
-	}
 
 	response := V2AllotmentResponse{
 		Status:         status,
@@ -87,12 +137,13 @@ func (h *V2AllotmentHandler) CheckAllotment(c *fiber.Ctx) error {
 
 	// Cache result (fire and forget)
 	result := models.IPOResultCache{
-		PanHash:        req.PAN,
-		IPOID:          ipo.ID,
-		Status:         status,
-		SharesAllotted: sharesAllotted,
-		Source:         "v2_check",
-		Timestamp:      time.Now(),
+		PanHash:           req.PAN,
+		IPOID:             ipo.ID,
+		Status:            status,
+		SharesAllotted:    sharesAllotted,
+		ApplicationNumber: allotmentResult.ApplicationNo,
+		Source:            "v2_check",
+		Timestamp:         time.Now(),
 	}
 	go h.CacheService.StoreResult(c.Context(), &result)
 
