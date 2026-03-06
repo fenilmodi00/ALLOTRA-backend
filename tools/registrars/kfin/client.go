@@ -26,10 +26,9 @@ const (
 )
 
 var (
-	kfinIPOScriptPathRegex = regexp.MustCompile(`"(/static/js/main\.[^"]+\.js)"`)
-	kfinIPODataRegex       = regexp.MustCompile(`JSON\.parse\('([^']+)'\)`)
+	kfinIPOScriptPathRegex = regexp.MustCompile(`src="[\.\/]*([^"]+\.js)"`)
+	kfinIPODataRegex       = regexp.MustCompile(`JSON\.parse\(\s*['"\x60](\[.*?clientId.*\])['"\x60]\s*\)`)
 )
-
 // shared.AllotmentResult contains detailed allotment data from KFin.
 type AllotmentResult struct {
 	Status         string // ALLOTTED, NOT_ALLOTTED, NOT_FOUND, ERROR
@@ -70,7 +69,9 @@ func (kc *Client) newHTTPClient() *http.Client {
 	return &http.Client{
 		Timeout: kfinTimeout,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			Proxy:             nil,
+			ForceAttemptHTTP2: false,
+			TLSNextProto:      map[string]func(string, *tls.Conn) http.RoundTripper{},
 		},
 		Jar: jar,
 	}
@@ -113,22 +114,24 @@ func (kc *Client) CheckAllotment(ctx context.Context, companyCode string, pan st
 // queryAPI sends a GET request to the KFin AWS API Gateway endpoint.
 // searchType is one of: "pan", "appno", "demat"
 func (kc *Client) queryAPI(ctx context.Context, client *http.Client, searchType string, searchValue string, companyCode string) (*shared.AllotmentResult, error) {
-	// Build the query URL
-	params := url.Values{}
-	params.Set("type", searchType)
-	params.Set("ipocode", companyCode)
+	// Build the query URL. KFin expects only `type` as query param and the
+	// actual lookup value/company code in custom headers.
+	if companyCode == "" {
+		return nil, fmt.Errorf("company code is required")
+	}
 
+	normalizedValue := searchValue
 	switch searchType {
 	case "pan":
-		params.Set("pan", strings.ToUpper(searchValue))
-	case "appno":
-		params.Set("appno", searchValue)
-	case "demat":
-		params.Set("demat", searchValue)
+		normalizedValue = strings.ToUpper(searchValue)
+	case "appno", "demat":
+		// keep as provided
 	default:
 		return nil, fmt.Errorf("unsupported search type: %s", searchType)
 	}
 
+	params := url.Values{}
+	params.Set("type", searchType)
 	apiURL := kfinAPIBaseURL + kfinQueryPath + "?" + params.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
@@ -136,6 +139,10 @@ func (kc *Client) queryAPI(ctx context.Context, client *http.Client, searchType 
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	kc.setHeaders(req)
+	// KFin upstream appears to expect these exact lowercase custom header keys.
+	req.Header["reqparam"] = []string{normalizedValue}
+	req.Header["client_id"] = []string{companyCode}
+	req.Header["Access-Control-Allow-Origin"] = []string{"*"}
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -148,13 +155,25 @@ func (kc *Client) queryAPI(ctx context.Context, client *http.Client, searchType 
 	}
 
 	// ── Phase 3: Parse the JSON Response ─────────────────────────────
-	var items []KFinAPIResponseItem
-	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
-		// The API may return a string message instead of an array on error
-		return &shared.AllotmentResult{Status: "NOT_FOUND"}, nil
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read KFin API response: %w", err)
 	}
 
-	return kc.parseAPIResponse(items), nil
+	var wrapped struct {
+		Data []KFinAPIResponseItem `json:"data"`
+	}
+	if err := json.Unmarshal(body, &wrapped); err == nil && wrapped.Data != nil {
+		return kc.parseAPIResponse(wrapped.Data), nil
+	}
+
+	var items []KFinAPIResponseItem
+	if err := json.Unmarshal(body, &items); err == nil {
+		return kc.parseAPIResponse(items), nil
+	}
+
+	// The API may return a plain object/string message on no data/error.
+	return &shared.AllotmentResult{Status: "NOT_FOUND"}, nil
 }
 
 // setHeaders sets standard browser-like headers on KFin API requests.
@@ -326,7 +345,14 @@ func (kc *Client) fetchIPOListFromJSBundle(ctx context.Context, client *http.Cli
 		return nil, fmt.Errorf("could not locate main JS bundle in KFin web page")
 	}
 
-	jsURL := kfinWebBaseURL + string(matches[1])
+	jsPath := string(matches[1])
+	if strings.HasPrefix(jsPath, "./") {
+		jsPath = jsPath[1:]
+	} else if !strings.HasPrefix(jsPath, "/") {
+		jsPath = "/" + jsPath
+	}
+
+	jsURL := kfinWebBaseURL + jsPath
 	jsReq, err := http.NewRequestWithContext(ctx, http.MethodGet, jsURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create JS bundle request: %w", err)

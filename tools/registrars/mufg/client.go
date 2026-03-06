@@ -261,67 +261,136 @@ func (mc *Client) findCompanyID(ctx context.Context, client *http.Client, compan
 		return "", fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(respObj.D))
-	if err != nil {
-		return "", err
-	}
-
-	normalizedTarget := strings.ToLower(strings.TrimSpace(companyName))
-	for _, suffix := range []string{" limited", " ltd", " ltd.", " ipo", " sme", " mainboard"} {
-		normalizedTarget = strings.TrimSuffix(normalizedTarget, suffix)
-	}
-	normalizedTarget = strings.TrimSpace(normalizedTarget)
-
-	type match struct {
-		value string
-		text  string
-		score int
-	}
-	var bestMatch match
-
-	doc.Find("option").Each(func(i int, s *goquery.Selection) {
-		val, exists := s.Attr("value")
-		text := strings.TrimSpace(s.Text())
-		if !exists || val == "0" || val == "" || strings.Contains(strings.ToLower(text), "select company") {
-			return
+	var matchCompanyNameFunc func(doc *goquery.Document) string
+	matchCompanyNameFunc = func(doc *goquery.Document) string {
+		normalizedTarget := strings.ToLower(strings.TrimSpace(companyName))
+		for _, suffix := range []string{" limited", " ltd", " ltd.", " ipo", " sme", " mainboard"} {
+			normalizedTarget = strings.TrimSuffix(normalizedTarget, suffix)
 		}
+		normalizedTarget = strings.TrimSpace(normalizedTarget)
 
-		cleanOption := strings.ToLower(text)
-		for _, suffix := range []string{" limited", " ltd", " ltd.", " ipo", " sme"} {
-			cleanOption = strings.TrimSuffix(cleanOption, suffix)
+		type match struct {
+			value string
+			text  string
+			score int
 		}
-		cleanOption = strings.TrimSpace(cleanOption)
+		var bestMatch match
 
-		var score int
-		if cleanOption == normalizedTarget {
-			score = 10000
-		} else if strings.Contains(cleanOption, normalizedTarget) {
-			score = 5000 + len(normalizedTarget)
-		} else if strings.Contains(normalizedTarget, cleanOption) {
-			score = 3000 + len(cleanOption)
-		} else {
-			targetWords := strings.Fields(normalizedTarget)
-			matchedWords := 0
-			for _, word := range targetWords {
-				if len(word) > 2 && strings.Contains(cleanOption, word) {
-					matchedWords++
+		doc.Find("option").Each(func(i int, s *goquery.Selection) {
+			val, exists := s.Attr("value")
+			text := strings.TrimSpace(s.Text())
+			if !exists || val == "0" || val == "" || strings.Contains(strings.ToLower(text), "select company") {
+				return
+			}
+
+			cleanOption := strings.ToLower(text)
+			for _, suffix := range []string{" limited", " ltd", " ltd.", " ipo", " sme"} {
+				cleanOption = strings.TrimSuffix(cleanOption, suffix)
+			}
+			cleanOption = strings.TrimSpace(cleanOption)
+
+			var score int
+			if cleanOption == normalizedTarget {
+				score = 10000
+			} else if strings.Contains(cleanOption, normalizedTarget) {
+				score = 5000 + len(normalizedTarget)
+			} else if strings.Contains(normalizedTarget, cleanOption) {
+				score = 3000 + len(cleanOption)
+			} else {
+				targetWords := strings.Fields(normalizedTarget)
+				matchedWords := 0
+				for _, word := range targetWords {
+					if len(word) > 2 && strings.Contains(cleanOption, word) {
+						matchedWords++
+					}
+				}
+				if matchedWords > 0 && matchedWords >= len(targetWords)/2 {
+					score = matchedWords * 100
 				}
 			}
-			if matchedWords > 0 && matchedWords >= len(targetWords)/2 {
-				score = matchedWords * 100
+
+			if score > bestMatch.score {
+				bestMatch = match{value: val, text: text, score: score}
 			}
+		})
+		return bestMatch.value
+	}
+
+	bestValue := ""
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(respObj.D))
+	if err == nil && doc.Find("option").Length() > 0 {
+		bestValue = matchCompanyNameFunc(doc)
+	} else {
+		type MUFGTable struct {
+			CompanyID   string `xml:"company_id"`
+			CompanyName string `xml:"companyname"`
+		}
+		type MUFGNewDataSet struct {
+			XMLName xml.Name    `xml:"NewDataSet"`
+			Table   []MUFGTable `xml:"Table"`
 		}
 
-		if score > bestMatch.score {
-			bestMatch = match{value: val, text: text, score: score}
-		}
-	})
+		var dataSet MUFGNewDataSet
+		if err := xml.Unmarshal([]byte(respObj.D), &dataSet); err == nil {
+			normalizedTarget := strings.ToLower(strings.TrimSpace(companyName))
+			for _, suffix := range []string{" limited", " ltd", " ltd.", " ipo", " sme", " mainboard"} {
+				normalizedTarget = strings.TrimSuffix(normalizedTarget, suffix)
+			}
+			normalizedTarget = strings.TrimSpace(normalizedTarget)
 
-	if bestMatch.value == "" {
+			type match struct {
+				value string
+				text  string
+				score int
+			}
+			var bestMatch match
+
+			for _, t := range dataSet.Table {
+				val := t.CompanyID
+				text := strings.TrimSpace(t.CompanyName)
+				if val == "0" || val == "" || strings.Contains(strings.ToLower(text), "select company") {
+					continue
+				}
+
+				cleanOption := strings.ToLower(text)
+				for _, suffix := range []string{" limited", " ltd", " ltd.", " ipo", " sme"} {
+					cleanOption = strings.TrimSuffix(cleanOption, suffix)
+				}
+				cleanOption = strings.TrimSpace(cleanOption)
+
+				var score int
+				if cleanOption == normalizedTarget {
+					score = 10000
+				} else if strings.Contains(cleanOption, normalizedTarget) {
+					score = 5000 + len(normalizedTarget)
+				} else if strings.Contains(normalizedTarget, cleanOption) {
+					score = 3000 + len(cleanOption)
+				} else {
+					targetWords := strings.Fields(normalizedTarget)
+					matchedWords := 0
+					for _, word := range targetWords {
+						if len(word) > 2 && strings.Contains(cleanOption, word) {
+							matchedWords++
+						}
+					}
+					if matchedWords > 0 && matchedWords >= len(targetWords)/2 {
+						score = matchedWords * 100
+					}
+				}
+
+				if score > bestMatch.score {
+					bestMatch = match{value: val, text: text, score: score}
+				}
+			}
+			bestValue = bestMatch.value
+		}
+	}
+
+	if bestValue == "" {
 		return "", fmt.Errorf("no matching company found for '%s'", companyName)
 	}
 
-	return bestMatch.value, nil
+	return bestValue, nil
 }
 
 func (mc *Client) GetActiveIPOs(ctx context.Context) ([]shared.DropdownOption, error) {
@@ -354,19 +423,39 @@ func (mc *Client) GetActiveIPOs(ctx context.Context) ([]shared.DropdownOption, e
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
+	var options []shared.DropdownOption
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(respObj.D))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse HTML: %w", err)
+	if err == nil && doc.Find("option").Length() > 0 {
+		doc.Find("option").Each(func(i int, s *goquery.Selection) {
+			val, exists := s.Attr("value")
+			text := strings.TrimSpace(s.Text())
+			if exists && val != "0" && val != "" && !strings.Contains(strings.ToLower(text), "select company") {
+				options = append(options, shared.DropdownOption{ID: val, Name: text})
+			}
+		})
 	}
 
-	var options []shared.DropdownOption
-	doc.Find("option").Each(func(i int, s *goquery.Selection) {
-		val, exists := s.Attr("value")
-		text := strings.TrimSpace(s.Text())
-		if exists && val != "0" && val != "" && !strings.Contains(strings.ToLower(text), "select company") {
-			options = append(options, shared.DropdownOption{ID: val, Name: text})
+	if len(options) == 0 {
+		type MUFGTable struct {
+			CompanyID   string `xml:"company_id"`
+			CompanyName string `xml:"companyname"`
 		}
-	})
+		type MUFGNewDataSet struct {
+			XMLName xml.Name    `xml:"NewDataSet"`
+			Table   []MUFGTable `xml:"Table"`
+		}
+
+		var dataSet MUFGNewDataSet
+		if err := xml.Unmarshal([]byte(respObj.D), &dataSet); err == nil {
+			for _, t := range dataSet.Table {
+				val := t.CompanyID
+				text := strings.TrimSpace(t.CompanyName)
+				if val != "0" && val != "" && !strings.Contains(strings.ToLower(text), "select company") {
+					options = append(options, shared.DropdownOption{ID: val, Name: text})
+				}
+			}
+		}
+	}
 
 	return options, nil
 }
